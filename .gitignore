@@ -1,0 +1,33 @@
+# Flutter / Dart
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/build/
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+
+# Python / FastAPI
+__pycache__/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/ginata.db
+backend/storage/uploads/*
+backend/storage/documents/*
+!backend/storage/uploads/.gitkeep
+!backend/storage/documents/.gitkeep
+.pytest_cache/
+*.pyc
+
+# Local uploads & zips
+uploads/
+*.zip
+patch_*.py
+fix_*.py
+
+# IDE / System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.env

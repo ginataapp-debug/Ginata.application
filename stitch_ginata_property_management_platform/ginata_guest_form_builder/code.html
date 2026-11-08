@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,400&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "error-container": "#ffdad6", "surface-variant": "#e6e2db", "tertiary-fixed": "#ffdcbe", "on-primary-fixed-variant": "#1d4f44", "surface-container": "#f1ede6", "primary": "#003329", "on-tertiary": "#ffffff", "tertiary": "#442500", "inverse-on-surface": "#f4f0e9", "primary-fixed-dim": "#9ed1c2", "on-primary-fixed": "#00201a", "tertiary-fixed-dim": "#ffb870", "secondary-fixed-dim": "#adcebe", "inverse-surface": "#31302c", "surface": "#fdf9f2", "tertiary-container": "#633800", "inverse-primary": "#9ed1c2", "on-tertiary-fixed": "#2d1600", "surface-bright": "#fdf9f2", "on-error": "#ffffff", "background": "#fdf9f2", "surface-dim": "#dddad3", "secondary-fixed": "#c8ead9", "surface-tint": "#37675b", "surface-container-high": "#ebe8e1", "on-tertiary-container": "#ed9e48", "secondary": "#466557", "on-primary-container": "#87b9aa", "on-primary": "#ffffff", "outline": "#707975", "on-tertiary-fixed-variant": "#693c00", "surface-container-low": "#f7f3ec", "primary-fixed": "#baedde", "on-secondary-fixed": "#012016", "primary-container": "#174a3f", "surface-container-lowest": "#ffffff", "on-background": "#1c1c18", "surface-container-highest": "#e6e2db", "secondary-container": "#c5e7d6", "on-surface": "#1c1c18", "on-surface-variant": "#404946", "outline-variant": "#c0c8c4", "on-secondary-fixed-variant": "#2f4d40", "error": "#ba1a1a", "on-error-container": "#93000a", "on-secondary-container": "#4a695c", "on-secondary": "#ffffff" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xl": "2rem", "margin": "1.25rem", "gutter-mobile": "0.75rem", "space-xs": "0.25rem", "space-sm": "0.5rem", "space-md": "1rem", "space-lg": "1.5rem", "margin-mobile": "1rem", "gutter": "1rem" }, "fontFamily": { "headline-md": ["Playfair Display"], "label-sm": ["Plus Jakarta Sans"], "title-lg": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "headline-lg": ["Playfair Display"], "body-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "headline-xl": ["Playfair Display"], "title-md": ["Plus Jakarta Sans"], "headline-xl-mobile": ["Playfair Display"] }, "fontSize": { "headline-md": ["20px", {"lineHeight": "26px", "fontWeight": "500"}], "label-sm": ["10px", {"lineHeight": "12px", "fontWeight": "700"}], "title-lg": ["18px", {"lineHeight": "24px", "fontWeight": "600"}], "label-md": ["11px", {"lineHeight": "14px", "fontWeight": "600"}], "body-lg": ["15px", {"lineHeight": "22px", "fontWeight": "400"}], "headline-lg": ["24px", {"lineHeight": "30px", "fontWeight": "600"}], "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}], "label-lg": ["13px", {"lineHeight": "18px", "fontWeight": "600"}], "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}], "headline-xl": ["32px", {"lineHeight": "40px", "fontWeight": "600"}], "title-md": ["16px", {"lineHeight": "22px", "fontWeight": "600"}], "headline-xl-mobile": ["26px", {"lineHeight": "32px", "fontWeight": "600"}] } } } }</script></head><body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(23,74,63,0.04)]"><div class="h-16 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><button aria-label="Go back" class="w-11 h-11 flex items-center justify-center -ml-2 rounded-full text-on-surface hover:text-primary active:scale-95 transition-all" onclick="history.back()"><span class="material-symbols-outlined text-[22px]">arrow_back_ios_new</span></button><img alt="Ginata Brand Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1UwZa-Fe1gUJLn7Q-TTuHrowFi2w-JMTrGfrAvytMMe2iNxYyWr9D3yUew9P1Va7YLDOEqkyW5ZzzgPz1PXxMlNMdLoTlMvtowE9Ewib67pSNDo83iUnygI5eI0fbAx9Wb9Sq26247FnPIS0NzjnzKf7EQdSEQ9C7Wzai84V8Bdko4dqbdYRUu9JMT3hned6PQht51HQfC64XlvnSkj-jKbl_zZWVZmJDNGM9gsJkFNm9CZGdv9BbmVKg"/><h1 class="font-title-md text-title-md text-primary leading-none">Guest Form Builder</h1></div><div class="flex items-center gap-space-xs"><button aria-label="Manager Profile" class="w-11 h-11 flex items-center justify-center rounded-full active:scale-95 transition-all"><img alt="Profile" class="w-8 h-8 rounded-full object-cover shadow-[0_2px_8px_rgba(23,74,63,0.12)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAifvoWya7NkzbTY873nIuq7JtqKgJupE7rzBdyQitIIBeqCaEpuzvHXJ_DG868Oi9TM9-j3agi-9jWRZSWTbUk66Dr5R--tRS-jn4LQyw09kmCjhlHx4uuQDulTlJ5fzDiPQK1tgs_Pij0ZUldrRoVg816Ty304dwO22hRF8lE-4fSC1MOmJim97xD7h9iHvC2GsabnnHapA4oUK8wDG8nnvX3lYPoNM1zAS7jaUsA3qzLDAxoWo0"/></button></div></div></header><main class="flex-1 w-full bg-surface pt-16 pb-safe"><div class="flex flex-col w-full pb-32">
+<!-- Demo Data Banner -->
+<aside aria-label="Configuration status" class="px-margin pt-3 pb-2 flex items-center justify-between">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary-container/60 text-on-secondary-container">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+<span class="font-label-sm text-label-sm tracking-wider uppercase">DEMO DATA • Form Configuration</span>
+</div>
+<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-secondary">cloud_done</span> Auto-synced
+    </span>
+</aside>
+<!-- Property Selector & Scope -->
+<section class="px-margin mt-1">
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-[0_4px_20px_-2px_rgba(13,38,32,0.04),0_1px_3px_0_rgba(13,38,32,0.02)] flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-surface-container-high shadow-inner">
+<img class="w-full h-full object-cover" data-alt="Sunlit cliffside luxury villa in Amalfi Coast Italy overlooking azure Mediterranean waters with stone balustrade, terracotta pots and Mediterranean cypress trees in serene warm editorial light" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7hyTvbqx7hg3hjcEBuKUeXokDvfrofkHFMCXOtmsx4rppQKoxVOnZR5U3obpMb9jeQLH80dYiFUCySUUydIq53_S1OqfaK2GlyLlL8MPCVdmMgs4kW8QDd0PX5RmgsXDzbFYWllxx61pIABz1e8MIYSIRECMAMcWKBKBI_aHVdjgDmf1Yolv8vxVnKRSCC-qa2-rUlT9uu8ePHqgaF1fDx37GUiT1mjk0iUL_5tUchGZM-Aozf-w"/>
+</div>
+<div class="min-w-0 flex flex-col">
+<span class="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Configuring For</span>
+<h2 class="font-title-md text-title-md text-on-surface truncate">Villa Serenità</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant truncate">Amalfi Coast, Italy • 4 Suites</p>
+</div>
+</div>
+<button aria-label="Switch property" class="px-3 py-1.5 rounded-full bg-surface-container text-on-surface font-label-md text-label-md flex items-center gap-1 shrink-0 active:scale-95 transition-transform" type="button">
+<span>Switch</span>
+<span class="material-symbols-outlined text-[16px]">expand_more</span>
+</button>
+</div>
+</section>
+<!-- Form Engine Segmented Control -->
+<section class="px-margin mt-4">
+<div class="p-1 rounded-xl bg-surface-container-high flex gap-1">
+<button class="flex-1 py-2 px-2.5 rounded-lg font-label-lg text-label-lg transition-all duration-200 bg-surface-container-lowest text-primary shadow-sm flex items-center justify-center gap-1.5" id="tab-ginata" onclick="selectProvider('ginata')" type="button">
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span>Ginata Hosted</span>
+<span class="px-1.5 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm scale-90">Best</span>
+</button>
+<button class="flex-1 py-2 px-2.5 rounded-lg font-label-lg text-label-lg transition-all duration-200 text-on-surface-variant flex items-center justify-center gap-1.5" id="tab-google" onclick="selectProvider('google')" type="button">
+<span class="material-symbols-outlined text-[16px]">sync_alt</span>
+<span>Google Forms</span>
+</button>
+</div>
+</section>
+<!-- Live Link & Distribution Hub Card -->
+<section class="px-margin mt-4">
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-[0_12px_32px_-4px_rgba(13,38,32,0.06),0_2px_6px_0_rgba(13,38,32,0.03)] flex flex-col gap-3.5">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary-container" style="box-shadow: 0 0 0 3px rgba(70,101,87,0.2);"></span>
+<span class="font-label-md text-label-md uppercase tracking-wider text-secondary">Live Check-in Portal</span>
+</div>
+<span class="font-label-sm text-label-sm px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant">v2.4 Published</span>
+</div>
+<!-- URL Pill Box -->
+<div class="bg-surface-container-low rounded-lg p-3 flex items-center justify-between gap-2">
+<div class="flex items-center gap-2 min-w-0">
+<span class="material-symbols-outlined text-secondary text-[18px] shrink-0">link</span>
+<span class="font-body-md text-body-md text-on-surface font-mono truncate select-all" id="portal-url">ginata.app/f/serenita-checkin</span>
+</div>
+<button class="px-3 py-1.5 rounded-full bg-primary-container text-on-primary font-label-md text-label-md shrink-0 flex items-center gap-1 active:scale-95 transition-all" id="copy-btn" onclick="copyFormLink()" type="button">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span id="copy-text">Copy</span>
+</button>
+</div>
+<!-- Quick Distribution Channels -->
+<div class="grid grid-cols-2 gap-2 pt-1">
+<button class="py-2.5 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-label-md flex items-center justify-center gap-2 active:scale-98 transition-transform" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">chat</span>
+<span>WhatsApp Guest</span>
+</button>
+<button class="py-2.5 px-3 rounded-xl bg-surface-container text-on-surface font-label-md text-label-md flex items-center justify-center gap-2 active:scale-98 transition-transform" type="button">
+<span class="material-symbols-outlined text-[18px] text-secondary">mail</span>
+<span>Email Invitation</span>
+</button>
+</div>
+<!-- Arrival Desk Stand QR Code Toggle -->
+<div class="pt-2">
+<div class="flex items-center justify-between">
+<div class="flex items-start gap-2.5 min-w-0 pr-3">
+<span class="material-symbols-outlined text-[20px] text-secondary mt-0.5">qr_code_2</span>
+<div>
+<p class="font-title-md text-title-md text-on-surface">Concierge Desk Physical Stand</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Display counter QR code for walk-in arrivals</p>
+</div>
+</div>
+<button class="px-2.5 py-1 rounded-full bg-secondary-container/70 text-on-secondary-container font-label-md text-label-md shrink-0 flex items-center gap-1" onclick="toggleQRDisplay()" type="button">
+<span id="qr-toggle-label">View QR</span>
+<span class="material-symbols-outlined text-[16px]" id="qr-toggle-icon">expand_more</span>
+</button>
+</div>
+<!-- Hidden/Expandable QR Preview Drawer -->
+<div class="hidden mt-3 p-3.5 rounded-xl bg-surface-container-low flex flex-col items-center text-center" id="qr-drawer">
+<div class="p-3 bg-surface-container-lowest rounded-xl shadow-sm mb-2 flex items-center justify-center">
+<!-- Precise inline SVG QR Graphic -->
+<svg class="w-32 h-32 text-primary" fill="currentColor" viewbox="0 0 100 100">
+<path d="M10 10h30v30h-30zM15 15v20h20v-20zM22 22h6v6h-6zM60 10h30v30h-30zM65 15v20h20v-20zM72 22h6v6h-6zM10 60h30v30h-30zM15 65v20h20v-20zM22 72h6v6h-6zM55 50h10v10h-10zM75 50h15v10h-15zM50 65h10v15h-10zM65 65h15v5h-15zM85 70h5v20h-5zM65 80h10v10h-10zM50 85h10v5h-10z"></path>
+</svg>
+</div>
+<span class="font-label-md text-label-md text-primary font-mono">STAND-AMALFI-SERENITA-01</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Ready for high-res foil print stand (A6 Concierge Card)</p>
+<button class="mt-2.5 px-3 py-1.5 rounded-full bg-surface-container-highest text-on-surface font-label-sm text-label-sm flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]">download</span>
+<span>Download Print PDF</span>
+</button>
+</div>
+</div>
+<!-- Automated Trigger Setting -->
+<div class="pt-3 flex items-center justify-between">
+<div class="pr-3">
+<p class="font-title-md text-title-md text-on-surface">Auto-Dispatch on Booking</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Sends via OTA API right after Airbnb or Booking.com reserve</p>
+</div>
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-secondary relative transition-colors duration-200 shrink-0 p-0.5" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="block w-6 h-6 rounded-full bg-surface-container-lowest shadow-sm transform translate-x-5 transition-transform duration-200"></span>
+</button>
+</div>
+</div>
+</section>
+<!-- Required Form Fields Configuration -->
+<section class="px-margin mt-6">
+<div class="flex items-center justify-between mb-2.5">
+<div>
+<h3 class="font-headline-md text-headline-md text-on-surface">Form Fields &amp; Verification</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Drag to reorder guest journey steps</p>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">6 Active</span>
+</div>
+<div class="flex flex-col gap-2.5" id="field-list">
+<!-- Item 1: Primary Guest Name (Locked) -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-outline-variant text-[20px] cursor-grab">drag_indicator</span>
+<div class="min-w-0">
+<div class="flex items-center gap-2">
+<p class="font-title-md text-title-md text-on-surface truncate">Primary Guest Full Name</p>
+<span class="px-1.5 py-0.2 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm">Locked</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Matches reservation passport record</p>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2 py-0.5 rounded-full bg-secondary-container/70 text-on-secondary-container font-label-sm text-label-sm">Required</span>
+</div>
+</div>
+<!-- Item 2: ID / Passport Upload (Encrypted) -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-outline-variant text-[20px] cursor-grab">drag_indicator</span>
+<div class="min-w-0">
+<div class="flex items-center gap-1.5 flex-wrap">
+<p class="font-title-md text-title-md text-on-surface truncate">Government ID / Passport</p>
+<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-primary-container text-on-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[10px]">lock</span> 256-bit
+              </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Mandatory for Italian Police Alloggiati sync</p>
+</div>
+</div>
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-secondary relative transition-colors shrink-0 p-0.5" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="block w-6 h-6 rounded-full bg-surface-container-lowest shadow-sm transform translate-x-5 transition-transform"></span>
+</button>
+</div>
+<!-- Item 3: Arrival Time & Travel Mode -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-outline-variant text-[20px] cursor-grab">drag_indicator</span>
+<div class="min-w-0">
+<p class="font-title-md text-title-md text-on-surface truncate">Estimated Arrival &amp; Flight/Train</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Triggers luggage delivery concierge notification</p>
+</div>
+</div>
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-secondary relative transition-colors shrink-0 p-0.5" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="block w-6 h-6 rounded-full bg-surface-container-lowest shadow-sm transform translate-x-5 transition-transform"></span>
+</button>
+</div>
+<!-- Item 4: Accompanying Guests -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-outline-variant text-[20px] cursor-grab">drag_indicator</span>
+<div class="min-w-0">
+<p class="font-title-md text-title-md text-on-surface truncate">Accompanying Guest Names &amp; Ages</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">For local city tourist tax calculations</p>
+</div>
+</div>
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-secondary relative transition-colors shrink-0 p-0.5" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="block w-6 h-6 rounded-full bg-surface-container-lowest shadow-sm transform translate-x-5 transition-transform"></span>
+</button>
+</div>
+<!-- Item 5: Dietary Preferences & Special Requests -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-outline-variant text-[20px] cursor-grab">drag_indicator</span>
+<div class="min-w-0">
+<p class="font-title-md text-title-md text-on-surface truncate">Dietary Preferences &amp; Requests</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Stock breakfast basket accordingly (Optional)</p>
+</div>
+</div>
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-secondary relative transition-colors shrink-0 p-0.5" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="block w-6 h-6 rounded-full bg-surface-container-lowest shadow-sm transform translate-x-5 transition-transform"></span>
+</button>
+</div>
+<!-- Item 6: Emergency Contact Phone -->
+<div class="bg-surface-container-lowest rounded-xl p-3.5 shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-outline-variant text-[20px] cursor-grab">drag_indicator</span>
+<div class="min-w-0">
+<p class="font-title-md text-title-md text-on-surface truncate">Emergency Contact Phone</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Alternative reachable number during stay</p>
+</div>
+</div>
+<button aria-checked="true" class="w-12 h-7 rounded-full bg-secondary relative transition-colors shrink-0 p-0.5" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="block w-6 h-6 rounded-full bg-surface-container-lowest shadow-sm transform translate-x-5 transition-transform"></span>
+</button>
+</div>
+<!-- Item 7: Vehicle License Plate (Disabled state) -->
+<div class="bg-surface-container-lowest/70 rounded-xl p-3.5 shadow-sm flex items-center justify-between opacity-70">
+<div class="flex items-center gap-3 min-w-0">
+<span class="material-symbols-outlined text-outline-variant text-[20px] cursor-grab">drag_indicator</span>
+<div class="min-w-0">
+<p class="font-title-md text-title-md text-on-surface truncate">Vehicle License Plate</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">ZTL Restricted Traffic Zone white-listing</p>
+</div>
+</div>
+<button aria-checked="false" class="w-12 h-7 rounded-full bg-surface-variant relative transition-colors shrink-0 p-0.5" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="block w-6 h-6 rounded-full bg-surface-container-lowest shadow-sm transform translate-x-0 transition-transform"></span>
+</button>
+</div>
+</div>
+<!-- Add Field Action -->
+<button class="w-full mt-3 py-3 rounded-xl bg-surface-container-high text-primary font-label-lg text-label-lg flex items-center justify-center gap-2 active:scale-98 transition-transform" onclick="addFieldPrompt()" type="button">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Add Custom Verification Field</span>
+</button>
+</section>
+<!-- Welcome Note & Editorial Touch -->
+<section class="px-margin mt-6">
+<div class="bg-surface-container-lowest rounded-xl p-4 shadow-sm flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md text-on-surface">Language &amp; Guest Greetings</h3>
+<span class="material-symbols-outlined text-secondary text-[20px]">translate</span>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1" for="form-lang-select">Form Language &amp; Intelligence</label>
+<div class="bg-surface-container-low rounded-lg p-2.5 flex items-center justify-between">
+<span class="font-body-md text-body-md text-on-surface">English (US) + Auto-detect locale</span>
+<span class="px-2 py-0.5 rounded bg-secondary-container/60 text-on-secondary-container font-label-sm text-label-sm">Smart AI</span>
+</div>
+</div>
+<div>
+<label class="block font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1" for="welcome-note">Custom Concierge Note</label>
+<textarea class="w-full p-3 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none resize-none" id="welcome-note" placeholder="Write a warm note to your guests..." rows="3">Welcome to Villa Serenità! Please complete this pre-arrival check-in so our concierge can prepare your arrival keys and welcome refreshments.</textarea>
+</div>
+<div class="flex items-center gap-2 pt-1 text-on-surface-variant font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified</span>
+<span>Includes GDPR compliance &amp; Italian Tourist Law disclaimer</span>
+</div>
+</div>
+</section>
+<!-- Floating Sticky Command Dock (Bottom Safe) -->
+<nav aria-label="Form actions" class="fixed bottom-4 left-0 right-0 z-40 px-margin flex items-center justify-center pointer-events-none">
+<div class="w-full max-w-md bg-surface/90 backdrop-blur-xl rounded-full p-2 shadow-[0_16px_36px_-6px_rgba(13,38,32,0.22)] flex items-center gap-2 pointer-events-auto">
+<button class="flex-1 py-3 px-4 rounded-full bg-surface-container text-on-surface font-title-md text-title-md flex items-center justify-center gap-1.5 active:scale-95 transition-transform" onclick="previewGuestView()" type="button">
+<span class="material-symbols-outlined text-[18px]">visibility</span>
+<span>Guest View</span>
+</button>
+<button class="flex-[1.5] py-3 px-4 rounded-full bg-primary text-on-primary font-title-md text-title-md flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all" id="save-btn" onclick="saveConfiguration()" type="button">
+<span class="material-symbols-outlined text-[18px]">save</span>
+<span id="save-label">Save &amp; Update</span>
+</button>
+</div>
+</nav>
+<!-- Toast Notification element -->
+<div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-primary-container text-on-primary px-4 py-2.5 rounded-full shadow-lg font-label-lg text-label-lg flex items-center gap-2 transition-all duration-300 opacity-0 pointer-events-none transform -translate-y-2" id="toast">
+<span class="material-symbols-outlined text-[18px] text-on-primary">check_circle</span>
+<span id="toast-message">Form configuration saved</span>
+</div>
+</div>
+<script>
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    const label = document.getElementById('toast-message');
+    label.textContent = msg;
+    toast.classList.remove('opacity-0', '-translate-y-2', 'pointer-events-none');
+    toast.classList.add('opacity-100', 'translate-y-0');
+    setTimeout(() => {
+      toast.classList.remove('opacity-100', 'translate-y-0');
+      toast.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
+    }, 2400);
+  }
+
+  function toggleSwitch(btn) {
+    const isChecked = btn.getAttribute('aria-checked') === 'true';
+    const knob = btn.querySelector('span');
+    if (isChecked) {
+      btn.setAttribute('aria-checked', 'false');
+      btn.classList.remove('bg-secondary');
+      btn.classList.add('bg-surface-variant');
+      knob.classList.remove('translate-x-5');
+      knob.classList.add('translate-x-0');
+    } else {
+      btn.setAttribute('aria-checked', 'true');
+      btn.classList.add('bg-secondary');
+      btn.classList.remove('bg-surface-variant');
+      knob.classList.remove('translate-x-0');
+      knob.classList.add('translate-x-5');
+    }
+  }
+
+  function toggleQRDisplay() {
+    const drawer = document.getElementById('qr-drawer');
+    const label = document.getElementById('qr-toggle-label');
+    const icon = document.getElementById('qr-toggle-icon');
+    const isHidden = drawer.classList.contains('hidden');
+    if (isHidden) {
+      drawer.classList.remove('hidden');
+      label.textContent = 'Hide QR';
+      icon.textContent = 'expand_less';
+    } else {
+      drawer.classList.add('hidden');
+      label.textContent = 'View QR';
+      icon.textContent = 'expand_more';
+    }
+  }
+
+  function copyFormLink() {
+    const url = document.getElementById('portal-url').textContent;
+    navigator.clipboard?.writeText(url);
+    const copyText = document.getElementById('copy-text');
+    copyText.textContent = 'Copied!';
+    showToast('Portal link copied to clipboard');
+    setTimeout(() => {
+      copyText.textContent = 'Copy';
+    }, 2000);
+  }
+
+  function selectProvider(type) {
+    const ginataTab = document.getElementById('tab-ginata');
+    const googleTab = document.getElementById('tab-google');
+    const portalUrl = document.getElementById('portal-url');
+
+    if (type === 'ginata') {
+      ginataTab.className = "flex-1 py-2 px-2.5 rounded-lg font-label-lg text-label-lg transition-all duration-200 bg-surface-container-lowest text-primary shadow-sm flex items-center justify-center gap-1.5";
+      googleTab.className = "flex-1 py-2 px-2.5 rounded-lg font-label-lg text-label-lg transition-all duration-200 text-on-surface-variant flex items-center justify-center gap-1.5";
+      portalUrl.textContent = "ginata.app/f/serenita-checkin";
+      showToast('Switched to Ginata Hosted Form');
+    } else {
+      googleTab.className = "flex-1 py-2 px-2.5 rounded-lg font-label-lg text-label-lg transition-all duration-200 bg-surface-container-lowest text-primary shadow-sm flex items-center justify-center gap-1.5";
+      ginataTab.className = "flex-1 py-2 px-2.5 rounded-lg font-label-lg text-label-lg transition-all duration-200 text-on-surface-variant flex items-center justify-center gap-1.5";
+      portalUrl.textContent = "docs.google.com/forms/d/e/1FAIpQL.../viewform";
+      showToast('Google Forms Bi-directional Sync active');
+    }
+  }
+
+  function addFieldPrompt() {
+    showToast('Add Field drawer ready for custom questions');
+  }
+
+  function previewGuestView() {
+    showToast('Opening mobile guest simulation view...');
+  }
+
+  function saveConfiguration() {
+    const btn = document.getElementById('save-btn');
+    const label = document.getElementById('save-label');
+    label.textContent = 'Saving...';
+    setTimeout(() => {
+      label.textContent = 'Save & Update';
+      showToast('Form published & live for Villa Serenità guests');
+    }, 700);
+  }
+</script></main></body></html>

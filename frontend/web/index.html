@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Ginata - Premium Property Management Platform for Luxury Estates & Stays.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Ginata">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Ginata</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body {
+      margin: 0;
+      background-color: #003329;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .splash-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .splash-logo {
+      width: 140px;
+      height: auto;
+      margin-bottom: 24px;
+    }
+    .splash-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(253, 249, 242, 0.2);
+      border-radius: 50%;
+      border-top-color: #FDF9F2;
+      animation: spin 1s ease-in-out infinite;
+    }
+    .splash-text {
+      margin-top: 16px;
+      color: #FDF9F2;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="splash-container" id="splash">
+    <img src="favicon.png" alt="Ginata Logo" class="splash-logo" />
+    <div class="splash-spinner"></div>
+    <div class="splash-text">Ginata Luxury Estates</div>
+  </div>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
