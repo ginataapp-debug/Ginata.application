@@ -450,7 +450,7 @@ class _ReservationDetailsSheetState extends State<_ReservationDetailsSheet> {
     try {
       final form = await ApiService.generateGuestForm(resId);
       final token = form['token'];
-      final link = 'http://localhost:8000/api/v1/public/forms/$token';
+      final link = '${ApiService.baseUrl}/public/forms/$token';
 
       if (mounted) {
         showDialog(

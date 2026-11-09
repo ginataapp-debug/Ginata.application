@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'theme/ginata_theme.dart';
+import 'services/auth_service.dart';
+import 'services/api_service.dart';
+import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/unified_calendar_screen.dart';
 import 'screens/reservations_screen.dart';
@@ -11,8 +15,9 @@ import 'screens/properties_screen.dart';
 import 'screens/finances_screen.dart';
 import 'screens/messages_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await ApiService.init();
   runApp(const GinataApp());
 }
 
@@ -25,8 +30,75 @@ class GinataApp extends StatelessWidget {
       title: 'Ginata',
       debugShowCheckedModeBanner: false,
       theme: buildGinataTheme(),
-      home: const MainNavigationShell(),
+      home: const AppEntryPoint(),
     );
+  }
+}
+
+/// Determines the launch flow: splash → login (if needed) → main app.
+class AppEntryPoint extends StatefulWidget {
+  const AppEntryPoint({super.key});
+
+  @override
+  State<AppEntryPoint> createState() => _AppEntryPointState();
+}
+
+class _AppEntryPointState extends State<AppEntryPoint> {
+  bool _showSplash = true;
+  bool? _isLoggedIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final loggedIn = await AuthService.isLoggedIn();
+    if (mounted) {
+      setState(() => _isLoggedIn = loggedIn);
+    }
+  }
+
+  void _onSplashComplete() {
+    if (mounted) {
+      setState(() => _showSplash = false);
+    }
+  }
+
+  void _onLoginSuccess() {
+    if (mounted) {
+      setState(() {
+        _isLoggedIn = true;
+        _showSplash = true; // Show splash animation after login
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Still loading auth state
+    if (_isLoggedIn == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF7F8FA),
+        body: Center(
+          child: CircularProgressIndicator(color: GinataColors.primary),
+        ),
+      );
+    }
+
+    // Not logged in → show login
+    if (_isLoggedIn == false) {
+      return LoginScreen(onLoginSuccess: _onLoginSuccess);
+    }
+
+    // Logged in but showing splash
+    if (_showSplash) {
+      return SplashScreen(onComplete: _onSplashComplete);
+    }
+
+    // Logged in, splash done → main app
+    return const MainNavigationShell();
   }
 }
 
@@ -112,6 +184,32 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                     _moreMenuItem(Icons.how_to_reg_outlined, 'Guest Registration Forms', 'Google Forms sync & guest agreements', 6, ctx),
                     _moreMenuItem(Icons.receipt_long_outlined, 'Invoice Studio', 'Generate guest receipts, invoices & vouchers', 7, ctx),
                     _moreMenuItem(Icons.person_outline, 'Host Profile & Settings', 'Edit host info, contacts, payout instructions', 8, ctx),
+                    const SizedBox(height: 8),
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: GinataColors.errorContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.logout, color: GinataColors.alertTerracotta, size: 20),
+                      ),
+                      title: const Text(
+                        'Sign Out',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: GinataColors.alertTerracotta),
+                      ),
+                      subtitle: const Text('End your session', style: TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        await AuthService.logout();
+                        if (mounted) {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (_) => const AppEntryPoint()),
+                            (route) => false,
+                          );
+                        }
+                      },
+                    ),
                   ],
                 ),
               ),

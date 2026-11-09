@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -26,7 +27,7 @@ class ApiService {
   static Map<String, dynamic> _localOrganization = {
     'id': orgId,
     'name': 'Ginata Property Management',
-    'email': 'concierge@ginata.ke',
+    'email': 'host@ginata.ke',
     'phone': '+254 700 000 000',
     'address': 'Nairobi, Kenya',
     'currency': 'KES',
@@ -34,13 +35,123 @@ class ApiService {
     'tagline': 'Bespoke Estates & Vacation Rentals',
   };
 
+
+  static SharedPreferences? _prefs;
+
+  static Future<void> init() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+      
+      final pStr = _prefs?.getString('cache_properties');
+      if (pStr != null && pStr.isNotEmpty) {
+        final list = jsonDecode(pStr) as List;
+        _localProperties.clear();
+        _localProperties.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final rStr = _prefs?.getString('cache_reservations');
+      if (rStr != null && rStr.isNotEmpty) {
+        final list = jsonDecode(rStr) as List;
+        _localReservations.clear();
+        _localReservations.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final iStr = _prefs?.getString('cache_invoices');
+      if (iStr != null && iStr.isNotEmpty) {
+        final list = jsonDecode(iStr) as List;
+        _localInvoices.clear();
+        _localInvoices.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final rcStr = _prefs?.getString('cache_receipts');
+      if (rcStr != null && rcStr.isNotEmpty) {
+        final list = jsonDecode(rcStr) as List;
+        _localReceipts.clear();
+        _localReceipts.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final expStr = _prefs?.getString('cache_expenses');
+      if (expStr != null && expStr.isNotEmpty) {
+        final list = jsonDecode(expStr) as List;
+        _localExpenses.clear();
+        _localExpenses.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final invStr = _prefs?.getString('cache_inventory');
+      if (invStr != null && invStr.isNotEmpty) {
+        final list = jsonDecode(invStr) as List;
+        _localInventory.clear();
+        _localInventory.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final orgStr = _prefs?.getString('cache_organization');
+      if (orgStr != null && orgStr.isNotEmpty) {
+        final org = jsonDecode(orgStr) as Map;
+        _localOrganization = Map<String, dynamic>.from(org);
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _persistProperties() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString('cache_properties', jsonEncode(_localProperties));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistReservations() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString('cache_reservations', jsonEncode(_localReservations));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistInvoices() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString('cache_invoices', jsonEncode(_localInvoices));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistReceipts() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString('cache_receipts', jsonEncode(_localReceipts));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistExpenses() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString('cache_expenses', jsonEncode(_localExpenses));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistInventory() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString('cache_inventory', jsonEncode(_localInventory));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistOrganization() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString('cache_organization', jsonEncode(_localOrganization));
+    } catch (_) {}
+  }
+
   // --- PROPERTIES ---
   static Future<List<dynamic>> fetchProperties() async {
     try {
       final res = await http.get(Uri.parse('$baseUrl/properties'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        if (list.isNotEmpty) return list;
+        _localProperties
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistProperties();
+        return list;
       }
     } catch (_) {}
     return List<dynamic>.from(_localProperties);
@@ -67,6 +178,7 @@ class ApiService {
       if (res.statusCode == 201) {
         final created = jsonDecode(res.body) as Map<String, dynamic>;
         _localProperties.add(created);
+        _persistProperties();
         return created;
       }
     } catch (_) {}
@@ -79,6 +191,7 @@ class ApiService {
       {'id': 'unit-${newProp['id']}-1', 'name': 'Main House', 'max_guests': 6}
     ];
     _localProperties.insert(0, newProp);
+    _persistProperties();
     return newProp;
   }
 
@@ -93,6 +206,7 @@ class ApiService {
         final updated = jsonDecode(res.body) as Map<String, dynamic>;
         final idx = _localProperties.indexWhere((p) => p['id'].toString() == propertyId);
         if (idx != -1) _localProperties[idx] = updated;
+        _persistProperties();
         return updated;
       }
     } catch (_) {}
@@ -100,6 +214,7 @@ class ApiService {
     final idx = _localProperties.indexWhere((p) => p['id'].toString() == propertyId);
     if (idx != -1) {
       _localProperties[idx].addAll(data);
+      _persistProperties();
       return _localProperties[idx];
     }
     return Map<String, dynamic>.from(data)..['id'] = propertyId;
@@ -113,6 +228,7 @@ class ApiService {
       ).timeout(_timeout);
     } catch (_) {}
     _localProperties.removeWhere((p) => p['id'].toString() == propertyId);
+    _persistProperties();
   }
 
   static Future<Map<String, dynamic>> syncPropertyChannels(String propertyId) async {
@@ -136,7 +252,11 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse('$baseUrl/properties/$propertyId/inventory'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localInventory.removeWhere((it) => it['property_id'].toString() == propertyId);
+        _localInventory.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistInventory();
+        return list;
       }
     } catch (_) {}
     return _localInventory.where((it) => it['property_id'].toString() == propertyId).toList();
@@ -152,6 +272,7 @@ class ApiService {
       if (res.statusCode == 201) {
         final item = jsonDecode(res.body) as Map<String, dynamic>;
         _localInventory.add(item);
+        _persistInventory();
         return item;
       }
     } catch (_) {}
@@ -160,6 +281,7 @@ class ApiService {
     item['id'] = 'inv-item-${DateTime.now().millisecondsSinceEpoch}';
     item['property_id'] = propertyId;
     _localInventory.add(item);
+    _persistInventory();
     return item;
   }
 
@@ -171,6 +293,7 @@ class ApiService {
       ).timeout(_timeout);
     } catch (_) {}
     _localInventory.removeWhere((it) => it['id'].toString() == itemId);
+    _persistInventory();
   }
 
   // --- FINANCES & EXPENSES ---
@@ -182,7 +305,12 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/finances/expenses').replace(queryParameters: params.isNotEmpty ? params : null);
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
 
@@ -206,6 +334,7 @@ class ApiService {
       if (res.statusCode == 201) {
         final exp = jsonDecode(res.body) as Map<String, dynamic>;
         _localExpenses.insert(0, exp);
+        _persistExpenses();
         return exp;
       }
     } catch (_) {}
@@ -215,6 +344,7 @@ class ApiService {
     exp['created_at'] = DateTime.now().toIso8601String();
     exp['expense_date'] = exp['expense_date'] ?? DateTime.now().toIso8601String().substring(0, 10);
     _localExpenses.insert(0, exp);
+    _persistExpenses();
     return exp;
   }
 
@@ -226,6 +356,7 @@ class ApiService {
       ).timeout(_timeout);
     } catch (_) {}
     _localExpenses.removeWhere((e) => e['id'].toString() == expenseId);
+    _persistExpenses();
   }
 
   static Future<Map<String, dynamic>> fetchFinancialSummary({String? propertyId}) async {
@@ -280,7 +411,12 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse('$baseUrl/messages/threads'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
     return List<dynamic>.from(_localMessageThreads);
@@ -312,7 +448,12 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse('$baseUrl/messages/threads/$threadId/messages'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
     final t = _localMessageThreads.firstWhere((th) => th['id'].toString() == threadId, orElse: () => {});
@@ -406,6 +547,7 @@ class ApiService {
       if (res.statusCode == 200) {
         final org = jsonDecode(res.body) as Map<String, dynamic>;
         _localOrganization = org;
+        _persistOrganization();
         return org;
       }
     } catch (_) {}
@@ -424,7 +566,11 @@ class ApiService {
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        if (list.isNotEmpty) return list;
+        _localReservations
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistReservations();
+        return list;
       }
     } catch (_) {}
 
@@ -467,6 +613,7 @@ class ApiService {
       if (res.statusCode == 201) {
         final r = jsonDecode(res.body) as Map<String, dynamic>;
         _localReservations.insert(0, r);
+        _persistReservations();
         return r;
       }
     } catch (_) {}
@@ -499,6 +646,7 @@ class ApiService {
     r['property'] = prop.isNotEmpty ? prop : {'name': 'Estate Suite', 'city': 'Nairobi'};
 
     _localReservations.insert(0, r);
+    _persistReservations();
     return r;
   }
 
@@ -553,7 +701,12 @@ class ApiService {
       if (res.statusCode == 200) {
         final r = jsonDecode(res.body) as Map<String, dynamic>;
         final idx = _localReservations.indexWhere((item) => item['id'].toString() == id);
-        if (idx != -1) _localReservations[idx] = r;
+        if (idx != -1) {
+          _localReservations[idx] = r;
+        } else {
+          _localReservations.insert(0, r);
+        }
+        _persistReservations();
         return r;
       }
     } catch (_) {}
@@ -561,6 +714,7 @@ class ApiService {
     final idx = _localReservations.indexWhere((item) => item['id'].toString() == id);
     if (idx != -1) {
       _localReservations[idx].addAll(data);
+      _persistReservations();
       return _localReservations[idx];
     }
     return Map<String, dynamic>.from(data)..['id'] = id;
@@ -664,7 +818,12 @@ class ApiService {
       );
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
     return List<dynamic>.from(_localSubmissions);
@@ -740,7 +899,11 @@ class ApiService {
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        if (list.isNotEmpty) return list;
+        _localInvoices
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistInvoices();
+        return list;
       }
     } catch (_) {}
     return List<dynamic>.from(_localInvoices);
@@ -767,6 +930,7 @@ class ApiService {
       if (res.statusCode == 201) {
         final inv = jsonDecode(res.body) as Map<String, dynamic>;
         _localInvoices.insert(0, inv);
+        _persistInvoices();
         return inv;
       }
     } catch (_) {}
@@ -832,6 +996,7 @@ class ApiService {
     };
 
     _localInvoices.insert(0, newInv);
+    _persistInvoices();
     return newInv;
   }
 
@@ -847,6 +1012,7 @@ class ApiService {
         final inv = jsonDecode(res.body) as Map<String, dynamic>;
         final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
         if (idx != -1) _localInvoices[idx] = inv;
+        _persistInvoices();
         return inv;
       }
     } catch (_) {}
@@ -854,6 +1020,7 @@ class ApiService {
     final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
     if (idx != -1) {
       _localInvoices[idx].addAll(data);
+      _persistInvoices();
       return _localInvoices[idx];
     }
     return Map<String, dynamic>.from(data)..['id'] = id;
@@ -869,6 +1036,7 @@ class ApiService {
         final inv = jsonDecode(res.body) as Map<String, dynamic>;
         final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
         if (idx != -1) _localInvoices[idx] = inv;
+        _persistInvoices();
         return inv;
       }
     } catch (_) {}
@@ -877,6 +1045,7 @@ class ApiService {
     if (idx != -1) {
       _localInvoices[idx]['status'] = 'issued';
       _localInvoices[idx]['issued_at'] = DateTime.now().toIso8601String();
+      _persistInvoices();
       return _localInvoices[idx];
     }
     return {'id': id, 'status': 'issued'};
@@ -936,7 +1105,12 @@ class ApiService {
       );
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
     return [];
@@ -950,7 +1124,23 @@ class ApiService {
         body: jsonEncode(data),
       ).timeout(_timeout);
       if (res.statusCode == 201) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
+        final payData = jsonDecode(res.body) as Map<String, dynamic>;
+        // Update local reservation cache with new payment info
+        final resId = data['reservation_id']?.toString();
+        if (resId != null) {
+          try {
+            final resRes = await http.get(
+              Uri.parse('$baseUrl/reservations/$resId'),
+              headers: _headers,
+            ).timeout(_timeout);
+            if (resRes.statusCode == 200) {
+              final updatedRes = jsonDecode(resRes.body) as Map<String, dynamic>;
+              final idx = _localReservations.indexWhere((r) => r['id'].toString() == resId);
+              if (idx != -1) _localReservations[idx] = updatedRes;
+            }
+          } catch (_) {}
+        }
+        return payData;
       }
     } catch (_) {}
 
@@ -992,6 +1182,9 @@ class ApiService {
       'remaining_balance': rIdx != -1 ? (_localReservations[rIdx]['balance_due'] ?? 0.0) : 0.0,
     };
     _localReceipts.insert(0, rec);
+    _persistReceipts();
+    _persistReservations();
+    _persistInvoices();
     return rec;
   }
 
@@ -1002,7 +1195,12 @@ class ApiService {
       );
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localReceipts
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistReceipts();
+        return list;
       }
     } catch (_) {}
     return List<dynamic>.from(_localReceipts);
@@ -1052,7 +1250,12 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse('$baseUrl/templates'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
     return [];
@@ -1081,7 +1284,12 @@ class ApiService {
       final uri = Uri.parse('$baseUrl/documents').replace(queryParameters: params.isNotEmpty ? params : null);
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
     return [];
@@ -1092,7 +1300,12 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse('$baseUrl/audit-logs'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as List<dynamic>;
+        final list = jsonDecode(res.body) as List<dynamic>;
+        _localExpenses
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistExpenses();
+        return list;
       }
     } catch (_) {}
     return [];

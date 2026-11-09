@@ -85,7 +85,7 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
                 const Text('Public Secure Download Link:'),
                 const SizedBox(height: 4),
                 SelectableText(
-                  'http://localhost:8000/api/v1/public/documents/${doc['secure_token']}/download',
+                  '${ApiService.baseUrl}/public/documents/${doc['secure_token']}/download',
                   style: const TextStyle(fontWeight: FontWeight.bold, color: GinataColors.primary),
                 ),
                 const SizedBox(height: 8),
@@ -129,7 +129,7 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
                 const Text('Public Secure Download Link:'),
                 const SizedBox(height: 4),
                 SelectableText(
-                  'http://localhost:8000/api/v1/public/documents/${doc['secure_token']}/download',
+                  '${ApiService.baseUrl}/public/documents/${doc['secure_token']}/download',
                   style: const TextStyle(fontWeight: FontWeight.bold, color: GinataColors.primary),
                 ),
                 const SizedBox(height: 8),

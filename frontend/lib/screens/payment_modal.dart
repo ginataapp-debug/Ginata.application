@@ -57,7 +57,9 @@ class _PaymentModalState extends State<PaymentModal> {
       };
 
       final payment = await ApiService.recordPayment(payload);
-      final receipt = payment['receipt'];
+      final receipt = (payment['receipt'] is Map)
+          ? Map<String, dynamic>.from(payment['receipt'] as Map)
+          : (payment['receipt_number'] != null ? Map<String, dynamic>.from(payment) : null);
 
       setState(() {
         _generatedReceipt = receipt;

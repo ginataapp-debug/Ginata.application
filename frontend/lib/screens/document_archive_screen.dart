@@ -60,7 +60,7 @@ class _DocumentArchiveScreenState extends State<DocumentArchiveScreen> {
                     final format = (doc['file_format'] ?? 'pdf').toString().toUpperCase();
                     final isPdf = format == 'PDF';
                     final token = doc['secure_token'];
-                    final dlUrl = 'http://localhost:8000/api/v1/public/documents/$token/download';
+                    final dlUrl = '${ApiService.baseUrl}/public/documents/$token/download';
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
