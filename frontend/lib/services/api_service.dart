@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static String baseUrl = 'http://localhost:8000/api/v1';
+  static String baseUrl = 'https://ginata-backend.onrender.com/api/v1';
   static const String orgId = 'org-ginata-prime';
-  static const Duration _timeout = Duration(milliseconds: 2500);
+  static const Duration _timeout = Duration(seconds: 10);
 
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -271,7 +271,7 @@ class ApiService {
       "pending_balance": pending,
       "total_agent_commissions": commissions,
       "total_expenses": totalExp,
-      "net_operating_profit": collected - totalExp - commissions,
+      "net_operating_profit": gross - totalExp - commissions,
     };
   }
 
@@ -450,11 +450,19 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> createReservation(Map<String, dynamic> data) async {
+    final payload = Map<String, dynamic>.from(data);
+    if (payload['primary_guest'] is Map) {
+      final pg = payload['primary_guest'] as Map;
+      payload['guest_first_name'] = pg['first_name'] ?? 'Guest';
+      payload['guest_last_name'] = pg['last_name'] ?? '';
+      payload['guest_email'] = pg['email'];
+      payload['guest_phone'] = pg['phone'];
+    }
     try {
       final res = await http.post(
         Uri.parse('$baseUrl/reservations'),
         headers: _headers,
-        body: jsonEncode(data),
+        body: jsonEncode(payload),
       ).timeout(_timeout);
       if (res.statusCode == 201) {
         final r = jsonDecode(res.body) as Map<String, dynamic>;
@@ -805,6 +813,9 @@ class ApiService {
       'billing_company_address': '',
       'payment_terms': 'Payment due upon invoice receipt via M-Pesa or Bank Wire.',
       'notes': 'Stay at ${prop['name'] ?? 'Estate'} for $nights nights. Direct rate with 0.00% VAT.',
+      'subtotal': totalAmt,
+      'discount_total': 0.0,
+      'tax_total': 0.0,
       'grand_total': totalAmt,
       'amount_paid': double.tryParse(r['amount_paid']?.toString() ?? '0') ?? 0.0,
       'balance_due': double.tryParse(r['balance_due']?.toString() ?? '$totalAmt') ?? totalAmt,
@@ -958,6 +969,14 @@ class ApiService {
       _localReservations[rIdx]['amount_paid'] = newPaid;
       _localReservations[rIdx]['balance_due'] = newBal;
       _localReservations[rIdx]['payment_status'] = newBal <= 0 ? 'paid' : 'partially_paid';
+
+      for (final inv in _localInvoices) {
+        if (inv['reservation_id']?.toString() == resId) {
+          inv['amount_paid'] = newPaid;
+          inv['balance_due'] = newBal;
+          inv['status'] = newBal <= 0 ? 'paid' : 'partially_paid';
+        }
+      }
     }
 
     final rec = {
@@ -970,7 +989,7 @@ class ApiService {
       'transaction_reference': data['transaction_reference'] ?? 'MPESA-TX',
       'issued_to_name': data['payer_name'] ?? 'Guest',
       'issued_by_name': 'Host',
-      'remaining_balance': 0.0,
+      'remaining_balance': rIdx != -1 ? (_localReservations[rIdx]['balance_due'] ?? 0.0) : 0.0,
     };
     _localReceipts.insert(0, rec);
     return rec;

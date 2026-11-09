@@ -48,7 +48,7 @@ def create_message_thread(
         msg = Message(
             thread_id=thread.id,
             sender_type="host",
-            sender_name="Host Clara",
+            sender_name="Host",
             content=thread_in.initial_message,
             is_read=True
         )
@@ -99,7 +99,7 @@ def send_message(
     msg = Message(
         thread_id=thread.id,
         sender_type=msg_in.sender_type or "host",
-        sender_name=msg_in.sender_name or "Host Clara",
+        sender_name=msg_in.sender_name or "Host",
         content=msg_in.content,
         is_read=True
     )

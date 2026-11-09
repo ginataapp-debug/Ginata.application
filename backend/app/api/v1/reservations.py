@@ -50,7 +50,7 @@ def create_reservation(
         db=db,
         organization_id=org_id,
         booking_in=booking_in,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.post("/check-conflicts", response_model=ConflictCheckResponse)
@@ -104,7 +104,7 @@ def update_reservation_endpoint(
         organization_id=org_id,
         reservation_id=reservation_id,
         update_in=update_in,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.post("/{reservation_id}/confirm", response_model=ReservationResponse)
@@ -132,7 +132,7 @@ def confirm_reservation(
         entity_type="reservation",
         entity_id=res.id,
         action="confirmed_reservation",
-        actor_name="Host Clara",
+        actor_name="Host",
         details={"status": "confirmed"}
     )
     db.commit()
@@ -151,7 +151,7 @@ def cancel_reservation_endpoint(
         organization_id=org_id,
         reservation_id=reservation_id,
         reason=reason,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.post("/{reservation_id}/guest-form", response_model=GuestFormSubmissionResponse)

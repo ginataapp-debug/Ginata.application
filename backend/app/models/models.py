@@ -471,7 +471,7 @@ class AuditLog(Base):
     entity_type = Column(String(50), nullable=False)  # reservation, payment, invoice, receipt, guest_form
     entity_id = Column(String(36), nullable=False)
     action = Column(String(100), nullable=False)  # created, confirmed, overridden_conflict, payment_recorded, issued, etc.
-    actor_name = Column(String(100), default="Host Clara", nullable=False)
+    actor_name = Column(String(100), default="Host", nullable=False)
     details = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

@@ -246,6 +246,10 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
       final payload = <String, dynamic>{
         'property_id': _selectedPropertyId,
         'unit_id': _selectedUnitId,
+        'guest_first_name': _firstNameCtrl.text.trim(),
+        'guest_last_name': _lastNameCtrl.text.trim(),
+        'guest_email': _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : null,
+        'guest_phone': _phoneCtrl.text.trim().isNotEmpty ? _phoneCtrl.text.trim() : null,
         'primary_guest': {
           'first_name': _firstNameCtrl.text.trim(),
           'last_name': _lastNameCtrl.text.trim(),
@@ -745,8 +749,21 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('Commission: ${GinataFormatters.formatKES(_agentCommissionAmount)}', style: TextStyle(fontSize: 11, color: Colors.deepPurple.shade800)),
-                                    Text('Net Host: ${GinataFormatters.formatKES(_netHostPayout)}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.deepPurple.shade900)),
+                                    Flexible(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Text('Commission: ${GinataFormatters.formatKES(_agentCommissionAmount)}', style: TextStyle(fontSize: 11, color: Colors.deepPurple.shade800)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerRight,
+                                        child: Text('Net Host: ${GinataFormatters.formatKES(_netHostPayout)}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.deepPurple.shade900)),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

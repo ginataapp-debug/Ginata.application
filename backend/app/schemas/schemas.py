@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from decimal import Decimal
 from typing import List, Optional, Any, Dict
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 # Base & Shared
 class OrmModel(BaseModel):
@@ -153,8 +153,25 @@ class InitialPaymentInput(BaseModel):
 class ReservationCreate(BaseModel):
     property_id: str
     unit_id: Optional[str] = None
-    guest_first_name: str
-    guest_last_name: str
+    guest_first_name: Optional[str] = "Guest"
+    guest_last_name: Optional[str] = ""
+    primary_guest: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_primary_guest(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            pg = data.get("primary_guest")
+            if isinstance(pg, dict):
+                if not data.get("guest_first_name") and pg.get("first_name"):
+                    data["guest_first_name"] = pg.get("first_name")
+                if not data.get("guest_last_name") and pg.get("last_name") is not None:
+                    data["guest_last_name"] = pg.get("last_name")
+                if not data.get("guest_email") and pg.get("email"):
+                    data["guest_email"] = pg.get("email")
+                if not data.get("guest_phone") and pg.get("phone"):
+                    data["guest_phone"] = pg.get("phone")
+        return data
     guest_email: Optional[str] = None
     guest_phone: Optional[str] = None
     booking_source: str = "direct"  # direct, phone, walk_in, airbnb, booking_com, other
@@ -360,7 +377,7 @@ class InvoiceLineItemResponse(InvoiceLineItemBase, OrmModel):
 
 # Invoice
 class InvoiceCreate(BaseModel):
-    reservation_id: str
+    reservation_id: Optional[str] = None
     document_type: str = "invoice"  # invoice, pro_forma, quotation
     due_date: Optional[date] = None
     currency: str = "KES"
@@ -691,7 +708,7 @@ class PropertyInventoryItemResponse(PropertyInventoryItemBase, OrmModel):
 class MessageBase(BaseModel):
     content: str
     sender_type: str = "host"
-    sender_name: str = "Host Clara"
+    sender_name: str = "Host"
 
 class MessageCreate(MessageBase):
     pass

@@ -45,7 +45,7 @@ def review_submission(
         organization_id=org_id,
         submission_id=submission_id,
         review_in=review_in,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.post("/guest-forms/tokens/{token}/revoke", response_model=GuestFormSubmissionResponse)
@@ -58,7 +58,7 @@ def revoke_token(
         db=db,
         organization_id=org_id,
         token=token,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 # Google Forms Integration status & synchronization
@@ -120,7 +120,7 @@ def sync_google_forms(
             organization_id=org_id,
             mode="google_forms",
             title="Google Sheets Guest Responses Sync",
-            google_connected_email="clara.host@gmail.com",
+            google_connected_email="host@ginata.ke",
             google_form_id="1FAIpQLSe-SampleGoogleFormId12345",
             google_sheet_id="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
             google_sync_status="connected",

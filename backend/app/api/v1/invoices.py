@@ -56,7 +56,7 @@ def update_invoice_endpoint(
         organization_id=org_id,
         invoice_id=invoice_id,
         update_in=update_in,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.post("/{invoice_id}/issue", response_model=InvoiceResponse)
@@ -69,7 +69,7 @@ def issue_invoice_endpoint(
         db=db,
         organization_id=org_id,
         invoice_id=invoice_id,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.post("/{invoice_id}/export", response_model=GeneratedDocumentResponse)
@@ -109,7 +109,7 @@ def send_invoice_endpoint(
         channel=send_in.channel,
         recipient=send_in.recipient,
         custom_message=send_in.custom_message,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
     return attempt
 
@@ -123,5 +123,5 @@ def issue_credit_note(
         db=db,
         organization_id=org_id,
         credit_in=credit_in,
-        actor_name="Host Clara"
+        actor_name="Host"
     )

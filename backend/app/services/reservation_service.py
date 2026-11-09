@@ -119,7 +119,7 @@ def create_manual_booking(
     db: Session,
     organization_id: str,
     booking_in: ReservationCreate,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Reservation:
     """
     Creates a manual reservation with full validation, capacity checks, conflict checking,
@@ -375,7 +375,7 @@ def update_reservation(
     organization_id: str,
     reservation_id: str,
     update_in: ReservationUpdate,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Reservation:
     """Updates permitted details on a reservation with recalculations and conflict checks."""
     reservation = db.execute(
@@ -508,7 +508,7 @@ def cancel_reservation(
     organization_id: str,
     reservation_id: str,
     reason: Optional[str] = None,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Reservation:
     """Cancels a reservation and records in audit log."""
     reservation = db.execute(

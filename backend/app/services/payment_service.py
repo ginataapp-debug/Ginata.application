@@ -16,7 +16,7 @@ def record_payment_and_issue_receipt(
     db: Session,
     organization_id: str,
     payment_in: PaymentCreate,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Payment:
     """
     Records a payment against a reservation (and optional invoice),
@@ -45,6 +45,14 @@ def record_payment_and_issue_receipt(
                 Invoice.organization_id == organization_id
             )
         ).scalar_one_or_none()
+    else:
+        invoice = db.execute(
+            select(Invoice).where(
+                Invoice.reservation_id == res.id,
+                Invoice.organization_id == organization_id,
+                Invoice.status.in_(["draft", "issued", "partially_paid"])
+            ).order_by(Invoice.created_at.desc())
+        ).scalars().first()
 
     # 1. Create Payment
     payment = Payment(
@@ -135,7 +143,7 @@ def update_receipt(
     organization_id: str,
     receipt_id: str,
     update_in,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Receipt:
     """Updates permitted receipt details with audit logging."""
     receipt = db.execute(

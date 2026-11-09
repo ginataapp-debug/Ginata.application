@@ -920,18 +920,35 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
               onPressed: () async {
                 Navigator.pop(dialogCtx);
                 try {
-                  String targetResId = selectedResId ?? 'direct-${DateTime.now().millisecondsSinceEpoch}';
-                  if (isCustom) {
+                  String targetResId = selectedResId ?? '';
+                  if (isCustom || targetResId.isEmpty) {
                     final n = int.tryParse(nightsCtrl.text) ?? 1;
                     final r = double.tryParse(rateCtrl.text) ?? 15000;
-                    // Create direct reservation first if needed
+                    final props = await ApiService.fetchProperties();
+                    String propId;
+                    if (props.isNotEmpty) {
+                      propId = props.first['id'].toString();
+                    } else {
+                      final newProp = await ApiService.createProperty({
+                        'name': propNameCtrl.text.trim().isNotEmpty ? propNameCtrl.text.trim() : 'Primary Estate',
+                        'city': 'Nairobi',
+                        'country': 'Kenya',
+                        'base_rate_night': r,
+                      });
+                      propId = newProp['id'].toString();
+                    }
+                    final now = DateTime.now();
+                    final checkInStr = DateFormat('yyyy-MM-dd').format(now);
+                    final checkOutStr = DateFormat('yyyy-MM-dd').format(now.add(Duration(days: n)));
+
                     final directRes = await ApiService.createReservation({
-                      'property_id': 'prop-direct',
-                      'primary_guest': {'first_name': guestNameCtrl.text.trim(), 'last_name': ''},
-                      'property': {'name': propNameCtrl.text.trim()},
+                      'property_id': propId,
+                      'guest_first_name': guestNameCtrl.text.trim().isNotEmpty ? guestNameCtrl.text.trim() : 'Valued Guest',
+                      'guest_last_name': '',
+                      'check_in_date': checkInStr,
+                      'check_out_date': checkOutStr,
                       'number_of_nights': n,
                       'nightly_rate': r,
-                      'total_amount': n * r,
                       'booking_source': 'direct',
                     });
                     targetResId = directRes['id'].toString();
@@ -1474,10 +1491,10 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
                         // Footer Thank You Note
                         Center(
                           child: Column(
-                            children: const [
-                              Text('Official Verification & Financial Audit Record', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GinataColors.secondary)),
+                            children: [
+                              const Text('Official Verification & Financial Audit Record', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: GinataColors.secondary)),
                               SizedBox(height: 2),
-                              Text('Thank you for choosing Ginata Luxury Accommodations.', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: GinataColors.textSecondary)),
+                              Text('Thank you for choosing ${_orgProfile?['name'] ?? 'Ginata Luxury Accommodations'}.', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: GinataColors.textSecondary)),
                             ],
                           ),
                         ),

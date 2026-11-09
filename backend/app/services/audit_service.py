@@ -8,7 +8,7 @@ def log_audit_event(
     entity_type: str,
     entity_id: str,
     action: str,
-    actor_name: str = "Host Clara",
+    actor_name: str = "Host",
     details: Optional[Dict[str, Any]] = None
 ) -> AuditLog:
     entry = AuditLog(

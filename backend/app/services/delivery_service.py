@@ -115,7 +115,7 @@ def send_document(
     channel: str,
     recipient: str,
     custom_message: Optional[str] = None,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> DocumentDeliveryAttempt:
     """
     Sends document via configured channel (email, whatsapp, secure_link).

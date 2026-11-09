@@ -62,7 +62,7 @@ def revoke_form_token(
     db: Session,
     organization_id: str,
     token: str,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> GuestFormSubmission:
     """Revokes a public guest form link."""
     submission = db.execute(
@@ -240,7 +240,7 @@ def review_guest_form_submission(
     organization_id: str,
     submission_id: str,
     review_in: SubmissionReviewRequest,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> GuestFormSubmission:
     """Host reviews submission, updates review notes, and marks status."""
     submission = db.execute(

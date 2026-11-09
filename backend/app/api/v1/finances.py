@@ -148,7 +148,7 @@ def get_financial_summary(
     pending = float(res_res.pending_balance)
     agent_comm = float(res_res.total_agent_commissions)
     total_exp = float(exp_res)
-    net_operating_profit = collected - agent_comm - total_exp
+    net_operating_profit = gross_rev - agent_comm - total_exp
 
     return {
         "currency": "KES",

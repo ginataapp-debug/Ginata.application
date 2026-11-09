@@ -86,7 +86,7 @@ def update_template(
         entity_type="template",
         entity_id=tpl.id,
         action="updated_template",
-        actor_name="Host Clara",
+        actor_name="Host",
         details={"name": tpl.name, "layout": tpl.layout_style}
     )
 
@@ -142,7 +142,7 @@ async def upload_template_logo(
         entity_type="template",
         entity_id=tpl.id,
         action="uploaded_logo",
-        actor_name="Host Clara",
+        actor_name="Host",
         details={"logo_name": safe_name}
     )
 

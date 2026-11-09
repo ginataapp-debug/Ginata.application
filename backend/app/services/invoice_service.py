@@ -19,7 +19,7 @@ def create_invoice_from_reservation(
     db: Session,
     organization_id: str,
     invoice_in: InvoiceCreate,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Invoice:
     """
     Creates an itemized invoice, pro forma invoice, or quotation connected to a reservation.
@@ -67,7 +67,7 @@ def create_invoice_from_reservation(
         supplier_name=org.name if org else "Ginata Hospitality",
         supplier_tax_pin=org.tax_id if (org and org.tax_id) else None,
         supplier_address=org.address if org else "P.O. Box 45000, Nairobi, Kenya",
-        supplier_email=org.email if org else "concierge@ginata.co.ke",
+        supplier_email=org.email if org else "host@ginata.ke",
         supplier_phone=org.phone if org else "+254 700 123 456",
         supplier_logo_url=org.logo_url or (template.logo_url if template else None),
         billing_name=billing_name,
@@ -117,7 +117,7 @@ def create_invoice_from_reservation(
             pos += 1
     else:
         # Default line items from reservation
-        tax_rate = prop.tax_rate if prop else Decimal("0.1600")
+        tax_rate = prop.tax_rate if prop else Decimal("0.0000")
         stay_desc = f"Accommodation: {prop.name if prop else 'Villa'} ({res.check_in_date} - {res.check_out_date})"
         stay_sub = Decimal(res.number_of_nights) * res.nightly_rate
         stay_tax = (stay_sub * tax_rate).quantize(Decimal("0.01"))
@@ -226,7 +226,7 @@ def update_invoice(
     organization_id: str,
     invoice_id: str,
     update_in: InvoiceUpdate,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Invoice:
     """Updates invoice line items and details if still in draft."""
     invoice = db.execute(
@@ -332,7 +332,7 @@ def issue_invoice(
     db: Session,
     organization_id: str,
     invoice_id: str,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> Invoice:
     """Freezes invoice, marks status as 'issued', and records timestamp."""
     invoice = db.execute(
@@ -366,7 +366,7 @@ def create_credit_note(
     db: Session,
     organization_id: str,
     credit_in: CreditNoteCreate,
-    actor_name: str = "Host Clara"
+    actor_name: str = "Host"
 ) -> CreditNote:
     """Issues a credit note against an invoice."""
     invoice = db.execute(

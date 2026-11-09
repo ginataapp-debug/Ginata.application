@@ -36,7 +36,7 @@ def record_payment(
         db=db,
         organization_id=org_id,
         payment_in=payment_in,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.get("/receipts", response_model=List[ReceiptResponse])
@@ -79,7 +79,7 @@ def update_receipt_endpoint(
         organization_id=org_id,
         receipt_id=receipt_id,
         update_in=update_in,
-        actor_name="Host Clara"
+        actor_name="Host"
     )
 
 @router.post("/receipts/{receipt_id}/export", response_model=GeneratedDocumentResponse)

@@ -806,7 +806,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
   Widget _buildMetricBadge(IconData icon, String label, String value) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
         decoration: BoxDecoration(
           color: GinataColors.surfaceSubdued,
           borderRadius: BorderRadius.circular(10),
@@ -828,7 +828,11 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
               ],
             ),
             const SizedBox(height: 4),
-            Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GinataColors.primary), overflow: TextOverflow.ellipsis),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GinataColors.primary)),
+            ),
           ],
         ),
       ),
@@ -932,10 +936,11 @@ class _PropertyInventoryDialogState extends State<_PropertyInventoryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 650),
+        constraints: BoxConstraints(maxWidth: 680, maxHeight: screenHeight * 0.9),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -996,113 +1001,120 @@ class _PropertyInventoryDialogState extends State<_PropertyInventoryDialog> {
               ),
               const SizedBox(height: 12),
 
-              // Add Form (Accordion - Mobile Responsive Stacking)
-              if (_showAddForm) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: _nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Item Name *', hintText: 'e.g. Smart TV, Linen Set, Coffee Machine'),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _category,
-                              decoration: const InputDecoration(labelText: 'Category'),
-                              items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
-                              onChanged: (val) => setState(() => _category = val ?? _category),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          SizedBox(
-                            width: 80,
-                            child: TextField(
-                              controller: _qtyCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Qty', hintText: '1'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _roomCtrl,
-                        decoration: const InputDecoration(labelText: 'Room Location', hintText: 'e.g. Master Suite, Kitchen, Lounge'),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _condition,
-                              decoration: const InputDecoration(labelText: 'Condition'),
-                              items: _conditions.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
-                              onChanged: (val) => setState(() => _condition = val ?? _condition),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: TextField(
-                              controller: _costCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Cost (KES)', prefixText: 'KES ', hintText: '0'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _notesCtrl,
-                        decoration: const InputDecoration(labelText: 'Notes / Serial No.', hintText: 'Model SN or warranty details'),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: GinataColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: _isSaving ? null : _saveItem,
-                          child: _isSaving
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Text('Save Inventory Item', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Item List
+              // Scrollable Area containing Add Form and Items List
               Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator(color: GinataColors.primary))
-                    : _items.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.inventory_2_outlined, size: 40, color: Colors.grey.shade400),
-                                const SizedBox(height: 8),
-                                const Text('No inventory items logged yet.', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                const Text('Click "Add Item" above to track linens, furniture, and appliances.', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                              ],
-                            ),
-                          )
-                        : ListView.separated(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_showAddForm) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: _nameCtrl,
+                                decoration: const InputDecoration(labelText: 'Item Name *', hintText: 'e.g. Smart TV, Linen Set, Coffee Machine'),
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: _category,
+                                      decoration: const InputDecoration(labelText: 'Category'),
+                                      items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                                      onChanged: (val) => setState(() => _category = val ?? _category),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  SizedBox(
+                                    width: 80,
+                                    child: TextField(
+                                      controller: _qtyCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(labelText: 'Qty', hintText: '1'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _roomCtrl,
+                                decoration: const InputDecoration(labelText: 'Room Location', hintText: 'e.g. Master Suite, Kitchen, Lounge'),
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: _condition,
+                                      decoration: const InputDecoration(labelText: 'Condition'),
+                                      items: _conditions.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+                                      onChanged: (val) => setState(() => _condition = val ?? _condition),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: _costCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(labelText: 'Cost (KES)', prefixText: 'KES ', hintText: '0'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              TextField(
+                                controller: _notesCtrl,
+                                decoration: const InputDecoration(labelText: 'Notes / Serial No.', hintText: 'Model SN or warranty details'),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: GinataColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                  onPressed: _isSaving ? null : _saveItem,
+                                  child: _isSaving
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                      : const Text('Save Inventory Item', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      _loading
+                          ? const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: GinataColors.primary)))
+                          : _items.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.inventory_2_outlined, size: 40, color: Colors.grey.shade400),
+                                        const SizedBox(height: 8),
+                                        const Text('No inventory items logged yet.', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 4),
+                                        const Text('Click "Add Item" above to track linens, furniture, and appliances.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
                             itemCount: _items.length,
                             separatorBuilder: (_, _) => const Divider(height: 1),
                             itemBuilder: (ctx, i) {
@@ -1147,6 +1159,9 @@ class _PropertyInventoryDialogState extends State<_PropertyInventoryDialog> {
                               );
                             },
                           ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
