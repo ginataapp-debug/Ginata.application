@@ -1,6 +1,8 @@
 import os
 import io
 import csv
+from dataclasses import dataclass
+from xml.sax.saxutils import escape
 from datetime import datetime, date
 from decimal import Decimal
 from pathlib import Path
@@ -31,6 +33,69 @@ LIGHT_BG = colors.HexColor("#F7F3EC")
 BORDER_COLOR = colors.HexColor("#E6E2DB")
 WHITE = colors.HexColor("#FFFFFF")
 
+
+_FONT_TRIPLES = {
+    "sans": ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique"),
+    "serif": ("Times-Roman", "Times-Bold", "Times-Italic"),
+    "mono": ("Courier", "Courier-Bold", "Courier-Oblique"),
+}
+
+
+def _resolve_font_triple(font_family: Optional[str]) -> Tuple[str, str, str]:
+    key = (font_family or "").lower()
+    if any(t in key for t in ("playfair", "times", "serif", "georgia", "garamond", "didot")):
+        return _FONT_TRIPLES["serif"]
+    if any(t in key for t in ("courier", "mono", "consolas", "typewriter")):
+        return _FONT_TRIPLES["mono"]
+    # Plus Jakarta Sans, Helvetica, Arial, Roboto, empty -> clean sans (original look)
+    return _FONT_TRIPLES["sans"]
+
+
+def _hex_to_color(value: Optional[str], fallback):
+    if not value:
+        return fallback
+    try:
+        return colors.HexColor(value.strip())
+    except Exception:
+        return fallback
+
+
+@dataclass
+class _DocTheme:
+    regular: str = "Helvetica"
+    bold: str = "Helvetica-Bold"
+    italic: str = "Helvetica-Oblique"
+    primary: colors.Color = FOREST_GREEN
+    secondary: colors.Color = SAGE_GREEN
+    layout: str = "minimalist_luxury"
+
+    @property
+    def header_centered(self) -> bool:
+        return self.layout == "classic_monograph"
+
+    @property
+    def header_band(self) -> bool:
+        return self.layout == "modern_corporate"
+
+    @property
+    def filled_table_header(self) -> bool:
+        return self.layout != "classic_monograph"
+
+
+def _resolve_theme(template: Optional[DocumentTemplate]) -> _DocTheme:
+    if template is None:
+        return _DocTheme()
+    regular, bold, italic = _resolve_font_triple(template.font_family)
+    return _DocTheme(
+        regular=regular,
+        bold=bold,
+        italic=italic,
+        primary=_hex_to_color(template.primary_color, FOREST_GREEN),
+        secondary=_hex_to_color(template.secondary_color, SAGE_GREEN),
+        layout=(template.layout_style or "minimalist_luxury").lower(),
+    )
+
+
 def format_kes(amount: Decimal, currency: str = "KES") -> str:
     """Formats decimal amount into readable currency string (e.g. KES 15,000.00)."""
     return f"{currency} {amount:,.2f}"
@@ -51,14 +116,17 @@ def get_logo_path(custom_logo_url: Optional[str] = None) -> Optional[str]:
 
 def generate_invoice_pdf(
     invoice: Invoice,
-    output_path: Optional[str] = None
+    output_path: Optional[str] = None,
+    template: Optional[DocumentTemplate] = None
 ) -> bytes:
     """
     Generates a professional PDF for an Invoice, Pro Forma, or Quotation using ReportLab.
+    Layout, typography and colors follow the supplied DocumentTemplate when provided.
     """
+    theme = _resolve_theme(template)
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer if output_path is None else output_path,
+        buffer,
         pagesize=A4,
         rightMargin=36,
         leftMargin=36,
@@ -71,23 +139,23 @@ def generate_invoice_pdf(
     title_style = ParagraphStyle(
         "DocTitle",
         parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
+        fontName=theme.bold,
         fontSize=20,
         leading=24,
-        textColor=FOREST_GREEN
+        textColor=theme.primary
     )
     subtitle_style = ParagraphStyle(
         "DocSubtitle",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
+        fontName=theme.bold,
         fontSize=10,
         leading=13,
-        textColor=SAGE_GREEN
+        textColor=theme.secondary
     )
     body_style = ParagraphStyle(
         "DocBody",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=theme.regular,
         fontSize=9,
         leading=13,
         textColor=CHARCOAL
@@ -95,20 +163,20 @@ def generate_invoice_pdf(
     body_bold = ParagraphStyle(
         "DocBodyBold",
         parent=body_style,
-        fontName="Helvetica-Bold"
+        fontName=theme.bold
     )
     table_header = ParagraphStyle(
         "TableHeader",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
+        fontName=theme.bold,
         fontSize=9,
         leading=11,
-        textColor=WHITE
+        textColor=WHITE if theme.filled_table_header else theme.primary
     )
     table_cell = ParagraphStyle(
         "TableCell",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=theme.regular,
         fontSize=8.5,
         leading=11,
         textColor=CHARCOAL
@@ -116,7 +184,7 @@ def generate_invoice_pdf(
     table_cell_bold = ParagraphStyle(
         "TableCellBold",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
+        fontName=theme.bold,
         fontSize=8.5,
         leading=11,
         textColor=CHARCOAL
@@ -126,61 +194,99 @@ def generate_invoice_pdf(
 
     # 1. Header with Logo & Document Identification
     logo_path = get_logo_path(invoice.supplier_logo_url)
-    logo_flowable = Paragraph(f"<b>{invoice.supplier_name}</b>", title_style)
+    logo_flowable = Paragraph(f"<b>{escape(invoice.supplier_name)}</b>", title_style)
     if logo_path:
         try:
             logo_flowable = RLImage(logo_path, width=120, height=45)
         except Exception:
             pass
 
-    doc_label = "TAX INVOICE"
+    doc_label = "INVOICE"
     if invoice.document_type == "pro_forma":
         doc_label = "PRO FORMA INVOICE"
     elif invoice.document_type == "quotation":
         doc_label = "PRICE QUOTATION"
 
-    header_table_data = [
-        [
-            logo_flowable,
-            [
-                Paragraph(doc_label, title_style),
-                Paragraph(f"<b>No:</b> {invoice.invoice_number}", subtitle_style),
-                Paragraph(f"<b>Date:</b> {invoice.issue_date.strftime('%d %b %Y')}", body_style),
-                Paragraph(f"<b>Due:</b> {invoice.due_date.strftime('%d %b %Y')}", body_style),
-                Paragraph(f"<b>Status:</b> {invoice.status.upper()}", subtitle_style),
-            ]
-        ]
+    meta_block = [
+        Paragraph(doc_label, title_style),
+        Paragraph(f"<b>No:</b> {invoice.invoice_number}", subtitle_style),
+        Paragraph(f"<b>Date:</b> {invoice.issue_date.strftime('%d %b %Y')}", body_style),
+        Paragraph(f"<b>Due:</b> {invoice.due_date.strftime('%d %b %Y')}", body_style),
+        Paragraph(f"<b>Status:</b> {invoice.status.upper()}", subtitle_style),
     ]
-    header_table = Table(header_table_data, colWidths=[300, 220])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-    ]))
-    story.append(header_table)
-    story.append(Spacer(1, 15))
-    story.append(HRFlowable(width="100%", thickness=1, color=BORDER_COLOR, spaceBefore=0, spaceAfter=15))
+
+    if theme.header_band:
+        # Modern Corporate: full-width primary color band with white document label.
+        band_label = ParagraphStyle("BandLabel", parent=title_style, textColor=WHITE, fontSize=18, leading=22)
+        band_sub = ParagraphStyle("BandSub", parent=subtitle_style, textColor=WHITE)
+        band_body = ParagraphStyle("BandBody", parent=body_style, textColor=WHITE)
+        band_inner = [
+            Paragraph(doc_label, band_label),
+            Paragraph(f"<b>No:</b> {invoice.invoice_number}", band_sub),
+            Paragraph(f"<b>Date:</b> {invoice.issue_date.strftime('%d %b %Y')} &nbsp;|&nbsp; <b>Due:</b> {invoice.due_date.strftime('%d %b %Y')}", band_body),
+            Paragraph(f"<b>Status:</b> {invoice.status.upper()}", band_sub),
+        ]
+        band_cells = [logo_flowable, band_inner] if logo_path else [band_inner]
+        band_widths = [140, 380] if logo_path else [520]
+        band = Table([band_cells], colWidths=band_widths)
+        band.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), theme.primary),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT') if logo_path else ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('LEFTPADDING', (0, 0), (-1, -1), 14),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 14),
+        ]))
+        story.append(band)
+        story.append(Spacer(1, 15))
+    elif theme.header_centered:
+        # Classic Monograph: centered serif masthead with a double rule.
+        centered = [Paragraph(f"<b>{escape(invoice.supplier_name)}</b>", title_style)] if not logo_path else [logo_flowable]
+        centered += meta_block
+        head = Table([[c] for c in centered], colWidths=[520])
+        head.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        story.append(head)
+        story.append(Spacer(1, 10))
+        story.append(HRFlowable(width="100%", thickness=2, color=theme.primary, spaceBefore=0, spaceAfter=2))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=theme.secondary, spaceBefore=0, spaceAfter=15))
+    else:
+        header_table_data = [[logo_flowable, meta_block]]
+        header_table = Table(header_table_data, colWidths=[300, 220])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 15))
+        story.append(HRFlowable(width="100%", thickness=1, color=BORDER_COLOR, spaceBefore=0, spaceAfter=15))
 
     # 2. Supplier & Guest / Company Billing Details
     supplier_lines = [
         Paragraph("<b>ISSUED BY (HOST)</b>", subtitle_style),
-        Paragraph(invoice.supplier_name, body_bold),
-        Paragraph(invoice.supplier_address or "Kenya", body_style),
-        Paragraph(f"Email: {invoice.supplier_email or 'concierge@ginata.co.ke'}", body_style),
-        Paragraph(f"Phone: {invoice.supplier_phone or '+254 700 000 000'}", body_style),
+        Paragraph(escape(invoice.supplier_name), body_bold),
+        Paragraph(escape(invoice.supplier_address or "Kenya"), body_style),
+        Paragraph(f"Email: {escape(invoice.supplier_email or '')}", body_style),
+        Paragraph(f"Phone: {escape(invoice.supplier_phone or '')}", body_style),
     ]
 
     billing_lines = [
         Paragraph("<b>BILLED TO (GUEST)</b>", subtitle_style),
-        Paragraph(invoice.billing_name, body_bold),
+        Paragraph(escape(invoice.billing_name), body_bold),
     ]
     if invoice.billing_company_name:
-        billing_lines.append(Paragraph(f"<b>Company:</b> {invoice.billing_company_name}", body_bold))
+        billing_lines.append(Paragraph(f"<b>Company:</b> {escape(invoice.billing_company_name)}", body_bold))
         if invoice.billing_company_address:
-            billing_lines.append(Paragraph(invoice.billing_company_address, body_style))
+            billing_lines.append(Paragraph(escape(invoice.billing_company_address), body_style))
     if invoice.billing_email:
-        billing_lines.append(Paragraph(f"Email: {invoice.billing_email}", body_style))
+        billing_lines.append(Paragraph(f"Email: {escape(invoice.billing_email)}", body_style))
     if invoice.billing_phone:
-        billing_lines.append(Paragraph(f"Phone: {invoice.billing_phone}", body_style))
+        billing_lines.append(Paragraph(f"Phone: {escape(invoice.billing_phone)}", body_style))
 
     parties_table = Table([[supplier_lines, billing_lines]], colWidths=[260, 260])
     parties_table.setStyle(TableStyle([
@@ -204,15 +310,15 @@ def generate_invoice_pdf(
     res_table = Table([
         [
             Paragraph("<b>Reservation Reference:</b>", body_bold),
-            Paragraph(res.booking_reference or res.id[:8] if res else "DIRECT", body_style),
+            Paragraph(escape((res.booking_reference or res.id[:8]) if res else "DIRECT"), body_style),
             Paragraph("<b>Property:</b>", body_bold),
-            Paragraph(prop_name, body_style)
+            Paragraph(escape(prop_name), body_style)
         ],
         [
             Paragraph("<b>Stay Duration:</b>", body_bold),
             Paragraph(dates_desc, body_style),
             Paragraph("<b>Booking Source:</b>", body_bold),
-            Paragraph((res.booking_source or "Direct").upper() if res else "DIRECT", body_style)
+            Paragraph(escape((res.booking_source or "Direct").upper()) if res else "DIRECT", body_style)
         ]
     ], colWidths=[130, 150, 100, 140])
     res_table.setStyle(TableStyle([
@@ -240,7 +346,7 @@ def generate_invoice_pdf(
     for idx, li in enumerate(invoice.line_items, start=1):
         items_data.append([
             Paragraph(str(idx), table_cell),
-            Paragraph(li.description, table_cell_bold),
+            Paragraph(escape(li.description), table_cell_bold),
             Paragraph(f"{li.quantity:,.0f}", table_cell),
             Paragraph(format_kes(li.unit_price, invoice.currency), table_cell),
             Paragraph(format_kes(li.tax_amount, invoice.currency), table_cell),
@@ -248,8 +354,7 @@ def generate_invoice_pdf(
         ])
 
     items_table = Table(items_data, colWidths=[25, 235, 45, 75, 65, 75])
-    items_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), FOREST_GREEN),
+    items_style = [
         ('ALIGN', (0, 0), (-1, 0), 'LEFT'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING', (0, 0), (-1, -1), 6),
@@ -257,7 +362,17 @@ def generate_invoice_pdf(
         ('BOX', (0, 0), (-1, -1), 0.5, BORDER_COLOR),
         ('INNERGRID', (0, 0), (-1, -1), 0.5, BORDER_COLOR),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [WHITE, LIGHT_BG]),
-    ]))
+    ]
+    if theme.filled_table_header:
+        items_style.append(('BACKGROUND', (0, 0), (-1, 0), theme.primary))
+    else:
+        # Classic Monograph: unfilled header ruled in the primary color.
+        items_style += [
+            ('BACKGROUND', (0, 0), (-1, 0), WHITE),
+            ('LINEABOVE', (0, 0), (-1, 0), 1.5, theme.primary),
+            ('LINEBELOW', (0, 0), (-1, 0), 1.5, theme.primary),
+        ]
+    items_table.setStyle(TableStyle(items_style))
     story.append(items_table)
     story.append(Spacer(1, 12))
 
@@ -300,17 +415,21 @@ def generate_invoice_pdf(
 
     # 6. Payment Instructions & Footer
     instructions_block = []
-    if invoice.payment_instructions:
+    payment_instructions = template.payment_instructions if template and template.payment_instructions is not None else invoice.payment_instructions
+    if payment_instructions:
         instructions_block.append(Paragraph("<b>PAYMENT INSTRUCTIONS</b>", subtitle_style))
-        instructions_block.append(Paragraph(invoice.payment_instructions, body_style))
+        instructions_block.append(Paragraph(escape(payment_instructions), body_style))
+    if template and template.tax_notes:
+        instructions_block.append(Paragraph(escape(template.tax_notes), body_style))
         instructions_block.append(Spacer(1, 4))
     if invoice.payment_terms:
-        instructions_block.append(Paragraph(f"<b>Terms:</b> {invoice.payment_terms}", body_style))
+        instructions_block.append(Paragraph(f"<b>Terms:</b> {escape(invoice.payment_terms)}", body_style))
     if invoice.notes:
-        instructions_block.append(Paragraph(f"<b>Notes:</b> {invoice.notes}", body_style))
-    if invoice.footer:
+        instructions_block.append(Paragraph(f"<b>Notes:</b> {escape(invoice.notes)}", body_style))
+    footer = template.footer_text if template and template.footer_text is not None else invoice.footer
+    if footer:
         instructions_block.append(Spacer(1, 6))
-        instructions_block.append(Paragraph(f"<i>{invoice.footer}</i>", body_style))
+        instructions_block.append(Paragraph(f"<i>{escape(footer)}</i>", body_style))
 
     if instructions_block:
         instr_table = Table([[instructions_block]], colWidths=[520])
@@ -337,14 +456,17 @@ def generate_invoice_pdf(
 
 def generate_receipt_pdf(
     receipt: Receipt,
-    output_path: Optional[str] = None
+    output_path: Optional[str] = None,
+    template: Optional[DocumentTemplate] = None
 ) -> bytes:
     """
     Generates an official Payment Receipt PDF using ReportLab.
+    Layout, typography and colors follow the supplied DocumentTemplate when provided.
     """
+    theme = _resolve_theme(template)
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer if output_path is None else output_path,
+        buffer,
         pagesize=A4,
         rightMargin=40,
         leftMargin=40,
@@ -356,23 +478,23 @@ def generate_receipt_pdf(
     title_style = ParagraphStyle(
         "RecTitle",
         parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
+        fontName=theme.bold,
         fontSize=20,
         leading=24,
-        textColor=FOREST_GREEN
+        textColor=theme.primary
     )
     subtitle_style = ParagraphStyle(
         "RecSub",
         parent=styles["Normal"],
-        fontName="Helvetica-Bold",
+        fontName=theme.bold,
         fontSize=11,
         leading=14,
-        textColor=SAGE_GREEN
+        textColor=theme.secondary
     )
     body_style = ParagraphStyle(
         "RecBody",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=theme.regular,
         fontSize=9.5,
         leading=14,
         textColor=CHARCOAL
@@ -380,45 +502,80 @@ def generate_receipt_pdf(
     body_bold = ParagraphStyle(
         "RecBodyBold",
         parent=body_style,
-        fontName="Helvetica-Bold"
+        fontName=theme.bold
     )
     big_amount = ParagraphStyle(
         "RecBigAmt",
         parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
+        fontName=theme.bold,
         fontSize=22,
         leading=26,
-        textColor=FOREST_GREEN
+        textColor=theme.primary
     )
 
     story = []
 
     # Header with Logo
     logo_path = get_logo_path()
-    logo_flowable = Paragraph("<b>GINATA PROPERTY MANAGEMENT</b>", title_style)
+    brand_name = (template.header_text if template and template.header_text else "GINATA PROPERTY MANAGEMENT")
+    logo_flowable = Paragraph(f"<b>{escape(brand_name)}</b>", title_style)
     if logo_path:
         try:
             logo_flowable = RLImage(logo_path, width=120, height=45)
         except Exception:
             pass
 
-    header_table = Table([
-        [
-            logo_flowable,
-            [
-                Paragraph("OFFICIAL RECEIPT", title_style),
-                Paragraph(f"<b>Receipt No:</b> {receipt.receipt_number}", subtitle_style),
-                Paragraph(f"<b>Date:</b> {receipt.receipt_date.strftime('%d %b %Y')}", body_style),
-            ]
+    meta_block = [
+        Paragraph("OFFICIAL RECEIPT", title_style),
+        Paragraph(f"<b>Receipt No:</b> {receipt.receipt_number}", subtitle_style),
+        Paragraph(f"<b>Date:</b> {receipt.receipt_date.strftime('%d %b %Y')}", body_style),
+    ]
+
+    if theme.header_band:
+        band_label = ParagraphStyle("RecBandLabel", parent=title_style, textColor=WHITE, fontSize=18, leading=22)
+        band_sub = ParagraphStyle("RecBandSub", parent=subtitle_style, textColor=WHITE)
+        band_body = ParagraphStyle("RecBandBody", parent=body_style, textColor=WHITE)
+        band_inner = [
+            Paragraph("OFFICIAL RECEIPT", band_label),
+            Paragraph(f"<b>Receipt No:</b> {receipt.receipt_number}", band_sub),
+            Paragraph(f"<b>Date:</b> {receipt.receipt_date.strftime('%d %b %Y')}", band_body),
         ]
-    ], colWidths=[280, 230])
-    header_table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-    ]))
-    story.append(header_table)
-    story.append(Spacer(1, 15))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=FOREST_GREEN, spaceBefore=0, spaceAfter=20))
+        band_cells = [logo_flowable, band_inner] if logo_path else [band_inner]
+        band_widths = [140, 370] if logo_path else [510]
+        band = Table([band_cells], colWidths=band_widths)
+        band.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), theme.primary),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT') if logo_path else ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('TOPPADDING', (0, 0), (-1, -1), 12),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+            ('LEFTPADDING', (0, 0), (-1, -1), 14),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 14),
+        ]))
+        story.append(band)
+        story.append(Spacer(1, 18))
+    elif theme.header_centered:
+        centered = ([logo_flowable] if logo_path else [Paragraph(f"<b>{escape(brand_name)}</b>", title_style)]) + meta_block
+        head = Table([[c] for c in centered], colWidths=[510])
+        head.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 1),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 1),
+        ]))
+        story.append(head)
+        story.append(Spacer(1, 10))
+        story.append(HRFlowable(width="100%", thickness=2, color=theme.primary, spaceBefore=0, spaceAfter=2))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=theme.secondary, spaceBefore=0, spaceAfter=20))
+    else:
+        header_table = Table([[logo_flowable, meta_block]], colWidths=[280, 230])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ]))
+        story.append(header_table)
+        story.append(Spacer(1, 15))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=theme.primary, spaceBefore=0, spaceAfter=20))
 
     # Amount Received Callout Box
     amt_box = Table([
@@ -431,7 +588,7 @@ def generate_receipt_pdf(
     ], colWidths=[510])
     amt_box.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), LIGHT_BG),
-        ('BOX', (0, 0), (-1, -1), 1, SAGE_GREEN),
+        ('BOX', (0, 0), (-1, -1), 1, theme.secondary),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('TOPPADDING', (0, 0), (-1, -1), 12),
@@ -448,13 +605,13 @@ def generate_receipt_pdf(
     prop_name = res.property.name if res and res.property else "Ginata Property"
 
     details_data = [
-        [Paragraph("<b>Received From:</b>", body_bold), Paragraph(receipt.issued_to_name, body_style)],
-        [Paragraph("<b>Payment Method:</b>", body_bold), Paragraph(receipt.payment_method.upper(), body_style)],
-        [Paragraph("<b>Transaction Ref:</b>", body_bold), Paragraph(tx_ref, body_style)],
-        [Paragraph("<b>Payment For:</b>", body_bold), Paragraph(f"Stay at {prop_name} (Ref: {res.booking_reference if res else 'N/A'})", body_style)],
-        [Paragraph("<b>Verification:</b>", body_bold), Paragraph("VERIFIED (Recorded by Authorized Host)" if payment and not payment.is_verified else "AUTOMATED VERIFIED", body_style)],
+        [Paragraph("<b>Received From:</b>", body_bold), Paragraph(escape(receipt.issued_to_name), body_style)],
+        [Paragraph("<b>Payment Method:</b>", body_bold), Paragraph(escape(receipt.payment_method.upper()), body_style)],
+        [Paragraph("<b>Transaction Ref:</b>", body_bold), Paragraph(escape(tx_ref or 'Not provided'), body_style)],
+        [Paragraph("<b>Payment For:</b>", body_bold), Paragraph(escape(f"Stay at {prop_name} (Ref: {res.booking_reference if res else 'N/A'})"), body_style)],
+        [Paragraph("<b>Verification:</b>", body_bold), Paragraph("Host confirmed" if payment and payment.is_verified else "Recorded by host", body_style)],
         [Paragraph("<b>Remaining Balance:</b>", body_bold), Paragraph(format_kes(receipt.remaining_balance, receipt.currency), body_bold)],
-        [Paragraph("<b>Issued By:</b>", body_bold), Paragraph(receipt.issued_by_name, body_style)],
+        [Paragraph("<b>Issued By:</b>", body_bold), Paragraph(escape(receipt.issued_by_name), body_style)],
     ]
 
     details_table = Table(details_data, colWidths=[150, 360])
@@ -473,8 +630,8 @@ def generate_receipt_pdf(
     # Signature / Verification Seal
     seal_data = [
         [
-            Paragraph("<b>Official Digital Seal</b><br/>Ginata Property Management<br/>Nairobi, Kenya", body_style),
-            Paragraph(f"<b>Authorized Signature:</b><br/><i>{receipt.issued_by_name}</i><br/>Ginata Concierge Operations", body_style)
+            Paragraph("<b>Issued by the Host</b><br/>Payment acknowledgment", body_style),
+            Paragraph(f"<b>Host:</b><br/>{escape(receipt.issued_by_name)}", body_style)
         ]
     ]
     seal_table = Table(seal_data, colWidths=[255, 255])
@@ -483,6 +640,9 @@ def generate_receipt_pdf(
         ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
     ]))
     story.append(seal_table)
+    if template and template.footer_text:
+        story.append(Spacer(1, 12))
+        story.append(Paragraph(escape(template.footer_text), body_style))
 
     doc.build(story)
     pdf_bytes = buffer.getvalue()
@@ -513,7 +673,7 @@ def generate_invoice_docx(
         section.right_margin = Inches(0.5)
 
     # Document Header Title
-    doc_label = "TAX INVOICE"
+    doc_label = "INVOICE"
     if invoice.document_type == "pro_forma":
         doc_label = "PRO FORMA INVOICE"
     elif invoice.document_type == "quotation":

@@ -448,6 +448,10 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                             firstDate: DateTime.now().subtract(const Duration(days: 30)),
                             lastDate: DateTime.now().add(const Duration(days: 730)),
                             initialDateRange: DateTimeRange(start: _checkIn, end: _checkOut),
+                            initialEntryMode: DatePickerEntryMode.calendar,
+                            helpText: 'SELECT STAY DATES',
+                            saveText: 'APPLY DATES',
+                            errorInvalidText: 'Check-out must be after check-in',
                             builder: (context, child) {
                               return Theme(
                                 data: Theme.of(context).copyWith(
@@ -482,23 +486,33 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Icon(Icons.calendar_month, color: GinataColors.primary, size: 18),
-                                  const SizedBox(width: 8),
-                                  const Text(
-                                    'Check-In & Check-Out Dates',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: GinataColors.primary),
+                                  const Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.calendar_month, color: GinataColors.primary, size: 16),
+                                        SizedBox(width: 6),
+                                        Flexible(
+                                          child: Text(
+                                            'Stay Dates & Range',
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: GinataColors.primary),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  const Spacer(),
+                                  const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                                     decoration: BoxDecoration(
                                       color: GinataColors.primary,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       '$_nights ${_nights == 1 ? "Night" : "Nights"}',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
                                     ),
                                   ),
                                 ],
@@ -508,7 +522,7 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                                 children: [
                                   Expanded(
                                     child: Container(
-                                      padding: const EdgeInsets.all(10),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(8),
@@ -519,18 +533,25 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                                         children: [
                                           const Text('CHECK-IN', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GinataColors.textSecondary)),
                                           const SizedBox(height: 2),
-                                          Text(DateFormat('EEE, MMM d, yyyy').format(_checkIn), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GinataColors.textPrimary)),
+                                          FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              DateFormat('EEE, MMM d, yyyy').format(_checkIn),
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GinataColors.textPrimary),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                   ),
                                   const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 8),
-                                    child: Icon(Icons.arrow_forward, size: 16, color: GinataColors.secondary),
+                                    padding: EdgeInsets.symmetric(horizontal: 6),
+                                    child: Icon(Icons.arrow_forward, size: 14, color: GinataColors.secondary),
                                   ),
                                   Expanded(
                                     child: Container(
-                                      padding: const EdgeInsets.all(10),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(8),
@@ -541,15 +562,37 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                                         children: [
                                           const Text('CHECK-OUT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GinataColors.textSecondary)),
                                           const SizedBox(height: 2),
-                                          Text(DateFormat('EEE, MMM d, yyyy').format(_checkOut), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GinataColors.textPrimary)),
+                                          FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              DateFormat('EEE, MMM d, yyyy').format(_checkOut),
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GinataColors.textPrimary),
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
-                              const Text('Tap anywhere on this card to open interactive date picker', style: TextStyle(fontSize: 10, color: GinataColors.textSecondary)),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  const Icon(Icons.date_range, size: 12, color: GinataColors.secondary),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Selected: ${DateFormat("MMM d").format(_checkIn)} – ${DateFormat("MMM d, yyyy").format(_checkOut)}',
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: GinataColors.secondary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Tap to change', style: TextStyle(fontSize: 10, color: GinataColors.textMuted)),
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -569,13 +612,14 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: _bookingSource,
-                              decoration: const InputDecoration(labelText: 'Booking Channel'),
+                              isExpanded: true,
+                              decoration: const InputDecoration(labelText: 'Channel'),
                               items: const [
-                                DropdownMenuItem(value: 'direct', child: Text('Direct (Host)')),
-                                DropdownMenuItem(value: 'phone', child: Text('Phone / Walk-in')),
-                                DropdownMenuItem(value: 'airbnb', child: Text('Airbnb')),
-                                DropdownMenuItem(value: 'booking_com', child: Text('Booking.com')),
-                                DropdownMenuItem(value: 'other', child: Text('Other')),
+                                DropdownMenuItem(value: 'direct', child: Text('Direct (Host)', overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'phone', child: Text('Phone/Walk-in', overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'airbnb', child: Text('Airbnb', overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'booking_com', child: Text('Booking.com', overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(value: 'other', child: Text('Other', overflow: TextOverflow.ellipsis)),
                               ],
                               onChanged: (v) => setState(() => _bookingSource = v ?? 'direct'),
                             ),

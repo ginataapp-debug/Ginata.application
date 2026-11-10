@@ -1,9 +1,9 @@
-# Ginata Property Management — 100% Free Production Deployment Guide
-## Complete Setup Using Supabase Free Tier (No VM, No Custom Domain, Zero Monthly Cost)
+# Ginata Property Management — Production Deployment Guide
+## Supabase PostgreSQL, FastAPI Backend, and Flutter Clients
 
-> **Cost:** \$0.00 / month forever  
-> **Hosting Type:** Serverless & Cloud-native (Managed PostgreSQL + Free Cloud API + Free Global CDN Web App)  
-> **No Credit Card Required** for initial setup on most tiers
+> **Cost:** Depends on provider plans, usage, storage, backups, and SMTP delivery. Free tiers may have quotas or expire.
+> **Hosting:** Managed PostgreSQL, a Python web service, and a static Flutter web app.
+> Verify current provider limits and backup arrangements before production use.
 
 ---
 
@@ -145,10 +145,138 @@ You do not need to pay $25 to Google Play Console or wait for approval to use th
 
 ---
 
-## 🔒 6. Zero-Maintenance Checklist
+## 6. Host Accounts, Email Confirmation, and Secure Sign-In
+
+**Supabase Auth is not used by this implementation.** The FastAPI backend owns
+accounts, password verification, email confirmation, and sessions in Supabase
+PostgreSQL. Enabling Supabase Auth or editing its email templates does not configure
+Ginata confirmation emails: configure the backend SMTP environment below instead.
+No browser or mobile app should receive your database password or service-role key.
+
+### Account and cross-device behavior
+- Signup creates a private organization and an **unverified** `host_users` row.
+  Passwords require at least **10 characters**, are never trimmed, and use salted,
+  versioned PBKDF2-HMAC-SHA256 with **600,000 iterations**. Existing unversioned
+  100,000-iteration hashes are accepted and upgraded after successful password verification.
+- Set `REQUIRE_EMAIL_VERIFICATION=true` in production. Signup sends a six-digit
+  email code and returns `verification_required=true` with **no token**. The app
+  opens a code dialog. Unverified accounts cannot log in or use protected endpoints.
+- `POST /api/v1/auth/verification/send` accepts email and password to send/resend a
+  code. `POST /api/v1/auth/verification/verify` accepts email and code. Codes are
+  stored only as slow salted hashes in `host_email_verifications`, expire, have a
+  limited attempt count, and are single-use. Resends invalidate older codes and
+  are rate-limited. Correct verification marks the email verified and issues a session.
+- If verification is required but SMTP is absent or delivery fails, signup returns
+  a clear **503** error, not a false "sent" or "verified" success.
+- Each signup (when allowed), confirmed email, or login creates an independent
+  `host_sessions` row: only the **SHA256 hash** of a random bearer token is stored,
+  together with its expiry. Logging in on another phone does **not** log out your
+  first device. Logout revokes only the presented device session.
+- Every protected request derives the organization from the authenticated active
+  host, not from a client-supplied organization header. Expired tokens and legacy
+  `host_users.session_token` values are ignored. Legacy raw tokens are cleared on login.
+- Flutter uses `flutter_secure_storage` for bearer tokens, not ordinary
+  SharedPreferences. Old plaintext tokens are **deleted, not migrated**, so users
+  must sign in once after updating. Passwords are not persisted.
+- Successful sign-in shows the actual host and verification status. Online session
+  validation is required; connection failures cannot create a fallback login.
+- Saved host names, email addresses, phone numbers, and offline guest/business
+  records use the secure-storage plugin too. Signing out or switching organizations
+  clears the previous host's cache. Legacy plaintext caches are discarded on upgrade.
+  Browser storage has the web limitations noted below; protect device access.
+- Property and booking saves, payments, expenses, invoices, receipts, and document
+  design changes require server confirmation; an offline or rejected request does
+  not fabricate a successful save. Cached records remain available for reading.
+- Changing the profile email resets verification, invalidates outstanding codes,
+  and, when verification is required, revokes all sessions. Sign in with the new
+  email and existing password, then use the confirmation dialog to send a code.
+
+### Backend environment on Render / Koyeb
+
+| Key | Production value / default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | `postgresql+psycopg://postgres.[REF]:[URL-ENCODED-PASSWORD]@[POOLER-HOST]:5432/postgres?sslmode=require` | Copy the **session pooler** URI from Supabase; keep it server-only. |
+| `REQUIRE_EMAIL_VERIFICATION` | `true` (local default: `false`) | Enforce real confirmation before access. Local signup still reports the email unverified. |
+| `AUTH_SESSION_TTL_HOURS` | `168` | Session lifetime (7 days by default); configure 1–8760 hours. |
+| `EMAIL_OTP_TTL_MINUTES` | `10` | Confirmation-code lifetime; configure 1–60 minutes. |
+| `EMAIL_OTP_MAX_ATTEMPTS` | `5` | Attempts per code; configure 1–10. |
+| `EMAIL_OTP_RESEND_SECONDS` | `60` | Minimum interval between sends per account. |
+| `SMTP_HOST` | Your provider's SMTP hostname | Required to send confirmation emails. |
+| `SMTP_PORT` | `587` for STARTTLS, or `465` for SSL | Provider's SMTP port. |
+| `SMTP_USERNAME` | Your provider's username | SMTP authentication, if required by the provider. |
+| `SMTP_PASSWORD` | Your SMTP credential / app password | Store as a backend secret, never in Flutter or git. |
+| `SMTP_FROM_EMAIL` | A sender verified with your provider | Required sender address. Configure provider SPF/DKIM as appropriate. |
+| `SMTP_STARTTLS` | `true` | Required when not using SSL. Plaintext SMTP is refused. |
+| `SMTP_USE_SSL` | `false` for port 587; `true` for port 465 | TLS from connection start on port 465. |
+| `SEED_DEMO_HOST` | `false` | Keep disabled in production. Explicit `true` is for isolated local demos/tests only. |
+| `CORS_ALLOWED_ORIGINS` | `https://ginata-estates.vercel.app` | Comma-separated exact frontend origins, no paths or wildcard. Local defaults permit loopback ports 3000 and 8080 only. |
+
+Restart the backend after environment changes. All devices must use the same API:
+
+```bash
+flutter build web --release --dart-define=API_URL=https://ginata-api.onrender.com/api/v1
+flutter build apk --release --dart-define=API_URL=https://ginata-api.onrender.com/api/v1
+```
+
+The API defaults to `https://ginata-backend.onrender.com/api/v1` if `API_URL` is not
+set. Both AuthService and ApiService share this setting. For local web development
+use a fixed permitted port (for example `flutter run -d chrome --web-port=8080`).
+
+### Supabase database setup and upgrade precautions
+1. Back up any existing database. Set the backend connection URI, deploy this code,
+   and restart. Startup creates missing `host_users`, `host_sessions`, and
+   `host_email_verifications` tables plus the application's other missing tables.
+   **`create_all` does not migrate existing columns or constraints**: reconcile
+   an older hand-created schema before production use; do not drop existing tables.
+2. Authentication tables must not be directly readable through Supabase's public
+   Data API. In Supabase SQL Editor, after the tables exist, an authorized admin
+   can apply the following protection (the backend connection role must retain
+   the required privileges and be able to bypass RLS; do not grant client policies):
+
+   ```sql
+   ALTER TABLE public.host_users ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.host_sessions ENABLE ROW LEVEL SECURITY;
+   ALTER TABLE public.host_email_verifications ENABLE ROW LEVEL SECURITY;
+   REVOKE ALL ON TABLE public.host_users, public.host_sessions,
+     public.host_email_verifications FROM anon, authenticated;
+   ```
+
+   Review protection of every other private tenant table too. Backend tenant
+   isolation does not protect a table exposed separately through the Data API.
+3. Previously published demo credentials `host@ginata.ke` / `host123456` are no
+   longer seeded by default. **An existing demo account is not automatically
+   changed or deleted. An authorized administrator must deactivate it in production.**
+   Review accounts marked verified by older signup code: those flags are not proof
+   of email ownership. Plan an authorized re-verification rollout; this update does
+   not silently reset existing users or modify hosted data.
+4. Optionally configure Storage separately. Creating buckets alone does not wire
+   backend uploads into Supabase Storage. Keep guest identification documents private.
+5. Run auth tests in isolation:
+   `python -m pytest backend/tests/test_auth.py -q`. They use temporary SQLite and
+   mocked SMTP. **Do not run `test_all.py` against your production/default database**;
+   its fixture drops tables. Full-suite testing requires a dedicated disposable DB
+   and explicit `SEED_DEMO_HOST=true` if those tests rely on the demo host.
+
+### Secure-storage platform notes
+`flutter_secure_storage` 11.2 supports the existing Windows file-picker dependency
+without a win32 version conflict. Android requires API 23+; review Android backup
+exclusions for secure storage before shipping. iOS/macOS require the plugin's
+Keychain entitlements; Linux needs libsecret and a running secret service. Those
+native platform settings are not changed by this auth patch. Test storage on each
+target device. Web requires HTTPS (or localhost) and uses browser encryption, not
+a hardware vault; it cannot prevent same-origin XSS, so use CSP and trusted scripts.
+Browser keys are device/browser-specific: sign in independently on each device.
+
+No real confirmation email or hosted database change is performed by the tests or
+this setup document. SMTP provider quotas/pricing are separate from Supabase, and
+free hosting/database tiers and backup guarantees should be checked before launch.
+
+---
+
+## 🔒 7. Zero-Maintenance Checklist
 
 - [x] **No VM to patch or maintain:** Supabase and Render manage all OS updates, firewall rules, and uptime automatically.
 - [x] **No domain renewal fees:** Render provides `*.onrender.com` with free SSL, and Vercel provides `*.vercel.app` with free SSL.
-- [x] **Automatic backups:** Supabase performs daily automated backups of your database.
-- [x] **0.00% VAT:** Conforms to direct rate rental operations without KRA PIN burdens.
+- [ ] **Backups:** Confirm your plan's backup coverage and test a restore before relying on it.
+- [ ] **Tax configuration:** Verify applicable taxes and registration requirements; a default zero tax rate is not a compliance guarantee.
 - [x] **Live iCal Feeds:** Your Airbnb and Booking.com iCal links sync automatically with `https://ginata-api.onrender.com/api/v1/properties/{id}/feed.ics`.

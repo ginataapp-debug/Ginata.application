@@ -1,16 +1,43 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  static String baseUrl = 'https://ginata-backend.onrender.com/api/v1';
-  static const String orgId = 'org-ginata-prime';
+  static const String baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'https://ginata-backend.onrender.com/api/v1',
+  );
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static String orgId = 'org-ginata-prime';
+  static String? authToken;
+  static String hostName = 'Host';
   static const Duration _timeout = Duration(seconds: 10);
 
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
     'X-Organization-ID': orgId,
+    if (authToken != null && authToken!.isNotEmpty) 'Authorization': 'Bearer $authToken',
   };
+
+  /// Loads the signed-in host's session (token, organization, name) from secure
+  /// local storage. Called at startup and after every sign-in / sign-out.
+  static Future<void> loadSession() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      for (final key in ['auth_token', 'host_name', 'host_email', 'host_phone']) {
+        await _prefs!.remove(key);
+      }
+      orgId = _prefs?.getString('host_org_id') ?? 'org-ginata-prime';
+      authToken = await _secureStorage.read(key: 'auth_token');
+      hostName = await _secureStorage.read(key: 'host_name') ?? 'Host';
+    } catch (_) {
+      authToken = null;
+      hostName = 'Host';
+    }
+    await prepareHostCache();
+  }
 
   // -------------------------------------------------------------
   // DYNAMIC IN-MEMORY STORE (Fresh Brand-New State for New Host)
@@ -22,69 +49,135 @@ class ApiService {
   static final List<Map<String, dynamic>> _localExpenses = [];
   static final List<Map<String, dynamic>> _localInventory = [];
   static final List<Map<String, dynamic>> _localMessageThreads = [];
+  static final List<Map<String, dynamic>> _localMessageTemplates = [];
   static final List<Map<String, dynamic>> _localSubmissions = [];
+  static final List<Map<String, dynamic>> _localPayments = [];
+  static final List<Map<String, dynamic>> _localTemplates = [];
+  static final List<Map<String, dynamic>> _localDocuments = [];
 
-  static Map<String, dynamic> _localOrganization = {
-    'id': orgId,
-    'name': 'Ginata Property Management',
-    'email': 'host@ginata.ke',
-    'phone': '+254 700 000 000',
-    'address': 'Nairobi, Kenya',
-    'currency': 'KES',
-    'vat_rate': 0.0,
-    'tagline': 'Bespoke Estates & Vacation Rentals',
-  };
-
+  static Map<String, dynamic> _localOrganization = {};
 
   static SharedPreferences? _prefs;
+
+  static Future<void> prepareHostCache() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final owner = authToken == null ? null : orgId;
+    final cachedOwner = owner == null ? null : await _secureStorage.read(key: 'cache_owner');
+    for (final key in _prefs!.getKeys().where((key) => key.startsWith('cache_'))) {
+      await _prefs!.remove(key);
+    }
+    if (owner != null && cachedOwner == owner) return;
+
+    for (final records in [
+      _localProperties, _localReservations, _localInvoices, _localReceipts,
+      _localExpenses, _localInventory, _localMessageThreads,
+      _localMessageTemplates, _localSubmissions, _localPayments,
+      _localTemplates, _localDocuments,
+    ]) {
+      records.clear();
+    }
+    _localOrganization = {};
+    for (final key in [
+      'cache_owner', 'cache_properties', 'cache_reservations', 'cache_invoices',
+      'cache_receipts', 'cache_expenses', 'cache_inventory', 'cache_payments',
+      'cache_templates', 'cache_documents', 'cache_message_threads',
+      'cache_message_templates', 'cache_submissions', 'cache_organization',
+    ]) {
+      await _secureStorage.delete(key: key);
+    }
+    if (owner != null) await _secureStorage.write(key: 'cache_owner', value: owner);
+  }
 
   static Future<void> init() async {
     try {
       _prefs = await SharedPreferences.getInstance();
-      
-      final pStr = _prefs?.getString('cache_properties');
+      await loadSession();
+
+      final pStr = await _secureStorage.read(key: 'cache_properties');
       if (pStr != null && pStr.isNotEmpty) {
         final list = jsonDecode(pStr) as List;
         _localProperties.clear();
         _localProperties.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
       }
 
-      final rStr = _prefs?.getString('cache_reservations');
+      final rStr = await _secureStorage.read(key: 'cache_reservations');
       if (rStr != null && rStr.isNotEmpty) {
         final list = jsonDecode(rStr) as List;
         _localReservations.clear();
         _localReservations.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
       }
 
-      final iStr = _prefs?.getString('cache_invoices');
+      final iStr = await _secureStorage.read(key: 'cache_invoices');
       if (iStr != null && iStr.isNotEmpty) {
         final list = jsonDecode(iStr) as List;
         _localInvoices.clear();
         _localInvoices.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
       }
 
-      final rcStr = _prefs?.getString('cache_receipts');
+      final rcStr = await _secureStorage.read(key: 'cache_receipts');
       if (rcStr != null && rcStr.isNotEmpty) {
         final list = jsonDecode(rcStr) as List;
         _localReceipts.clear();
         _localReceipts.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
       }
 
-      final expStr = _prefs?.getString('cache_expenses');
+      final expStr = await _secureStorage.read(key: 'cache_expenses');
       if (expStr != null && expStr.isNotEmpty) {
         final list = jsonDecode(expStr) as List;
         _localExpenses.clear();
         _localExpenses.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
       }
 
-      final invStr = _prefs?.getString('cache_inventory');
+      final invStr = await _secureStorage.read(key: 'cache_inventory');
       if (invStr != null && invStr.isNotEmpty) {
         final list = jsonDecode(invStr) as List;
         _localInventory.clear();
         _localInventory.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
       }
 
-      final orgStr = _prefs?.getString('cache_organization');
+      final payStr = await _secureStorage.read(key: 'cache_payments');
+      if (payStr != null && payStr.isNotEmpty) {
+        final list = jsonDecode(payStr) as List;
+        _localPayments.clear();
+        _localPayments.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final tplStr = await _secureStorage.read(key: 'cache_templates');
+      if (tplStr != null && tplStr.isNotEmpty) {
+        final list = jsonDecode(tplStr) as List;
+        _localTemplates.clear();
+        _localTemplates.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final docStr = await _secureStorage.read(key: 'cache_documents');
+      if (docStr != null && docStr.isNotEmpty) {
+        final list = jsonDecode(docStr) as List;
+        _localDocuments.clear();
+        _localDocuments.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final thStr = await _secureStorage.read(key: 'cache_message_threads');
+      if (thStr != null && thStr.isNotEmpty) {
+        final list = jsonDecode(thStr) as List;
+        _localMessageThreads.clear();
+        _localMessageThreads.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final mtStr = await _secureStorage.read(key: 'cache_message_templates');
+      if (mtStr != null && mtStr.isNotEmpty) {
+        final list = jsonDecode(mtStr) as List;
+        _localMessageTemplates.clear();
+        _localMessageTemplates.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final subStr = await _secureStorage.read(key: 'cache_submissions');
+      if (subStr != null && subStr.isNotEmpty) {
+        final list = jsonDecode(subStr) as List;
+        _localSubmissions.clear();
+        _localSubmissions.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+
+      final orgStr = await _secureStorage.read(key: 'cache_organization');
       if (orgStr != null && orgStr.isNotEmpty) {
         final org = jsonDecode(orgStr) as Map;
         _localOrganization = Map<String, dynamic>.from(org);
@@ -95,49 +188,91 @@ class ApiService {
   static Future<void> _persistProperties() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
-      await _prefs?.setString('cache_properties', jsonEncode(_localProperties));
+      await _secureStorage.write(key: 'cache_properties', value: jsonEncode(_localProperties));
     } catch (_) {}
   }
 
   static Future<void> _persistReservations() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
-      await _prefs?.setString('cache_reservations', jsonEncode(_localReservations));
+      await _secureStorage.write(key: 'cache_reservations', value: jsonEncode(_localReservations));
     } catch (_) {}
   }
 
   static Future<void> _persistInvoices() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
-      await _prefs?.setString('cache_invoices', jsonEncode(_localInvoices));
+      await _secureStorage.write(key: 'cache_invoices', value: jsonEncode(_localInvoices));
     } catch (_) {}
   }
 
   static Future<void> _persistReceipts() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
-      await _prefs?.setString('cache_receipts', jsonEncode(_localReceipts));
+      await _secureStorage.write(key: 'cache_receipts', value: jsonEncode(_localReceipts));
     } catch (_) {}
   }
 
   static Future<void> _persistExpenses() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
-      await _prefs?.setString('cache_expenses', jsonEncode(_localExpenses));
+      await _secureStorage.write(key: 'cache_expenses', value: jsonEncode(_localExpenses));
     } catch (_) {}
   }
 
   static Future<void> _persistInventory() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
-      await _prefs?.setString('cache_inventory', jsonEncode(_localInventory));
+      await _secureStorage.write(key: 'cache_inventory', value: jsonEncode(_localInventory));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistPayments() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _secureStorage.write(key: 'cache_payments', value: jsonEncode(_localPayments));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistTemplates() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _secureStorage.write(key: 'cache_templates', value: jsonEncode(_localTemplates));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistDocuments() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _secureStorage.write(key: 'cache_documents', value: jsonEncode(_localDocuments));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistMessageThreads() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _secureStorage.write(key: 'cache_message_threads', value: jsonEncode(_localMessageThreads));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistMessageTemplates() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _secureStorage.write(key: 'cache_message_templates', value: jsonEncode(_localMessageTemplates));
+    } catch (_) {}
+  }
+
+  static Future<void> _persistSubmissions() async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _secureStorage.write(key: 'cache_submissions', value: jsonEncode(_localSubmissions));
     } catch (_) {}
   }
 
   static Future<void> _persistOrganization() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
-      await _prefs?.setString('cache_organization', jsonEncode(_localOrganization));
+      await _secureStorage.write(key: 'cache_organization', value: jsonEncode(_localOrganization));
     } catch (_) {}
   }
 
@@ -169,66 +304,46 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> createProperty(Map<String, dynamic> data) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/properties'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 201) {
-        final created = jsonDecode(res.body) as Map<String, dynamic>;
-        _localProperties.add(created);
-        _persistProperties();
-        return created;
-      }
-    } catch (_) {}
-
-    final newProp = Map<String, dynamic>.from(data);
-    newProp['id'] = 'prop-${DateTime.now().millisecondsSinceEpoch}';
-    newProp['created_at'] = DateTime.now().toIso8601String();
-    newProp['tax_rate'] = 0.0;
-    newProp['units'] = [
-      {'id': 'unit-${newProp['id']}-1', 'name': 'Main House', 'max_guests': 6}
-    ];
-    _localProperties.insert(0, newProp);
-    _persistProperties();
-    return newProp;
+    final res = await http.post(
+      Uri.parse('$baseUrl/properties'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 201) {
+      throw Exception('Property could not be saved (${res.statusCode}).');
+    }
+    final created = jsonDecode(res.body) as Map<String, dynamic>;
+    _localProperties.insert(0, created);
+    await _persistProperties();
+    return created;
   }
 
   static Future<Map<String, dynamic>> updateProperty(String propertyId, Map<String, dynamic> data) async {
-    try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/properties/$propertyId'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        final updated = jsonDecode(res.body) as Map<String, dynamic>;
-        final idx = _localProperties.indexWhere((p) => p['id'].toString() == propertyId);
-        if (idx != -1) _localProperties[idx] = updated;
-        _persistProperties();
-        return updated;
-      }
-    } catch (_) {}
-
-    final idx = _localProperties.indexWhere((p) => p['id'].toString() == propertyId);
-    if (idx != -1) {
-      _localProperties[idx].addAll(data);
-      _persistProperties();
-      return _localProperties[idx];
+    final res = await http.patch(
+      Uri.parse('$baseUrl/properties/$propertyId'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Property changes could not be saved (${res.statusCode}).');
     }
-    return Map<String, dynamic>.from(data)..['id'] = propertyId;
+    final updated = jsonDecode(res.body) as Map<String, dynamic>;
+    final idx = _localProperties.indexWhere((p) => p['id'].toString() == propertyId);
+    if (idx != -1) _localProperties[idx] = updated;
+    await _persistProperties();
+    return updated;
   }
 
   static Future<void> deleteProperty(String propertyId) async {
-    try {
-      await http.delete(
-        Uri.parse('$baseUrl/properties/$propertyId'),
-        headers: _headers,
-      ).timeout(_timeout);
-    } catch (_) {}
+    final res = await http.delete(
+      Uri.parse('$baseUrl/properties/$propertyId'),
+      headers: _headers,
+    ).timeout(_timeout);
+    if (res.statusCode != 204) {
+      throw Exception('Property could not be deleted (${res.statusCode}).');
+    }
     _localProperties.removeWhere((p) => p['id'].toString() == propertyId);
-    _persistProperties();
+    await _persistProperties();
   }
 
   static Future<Map<String, dynamic>> syncPropertyChannels(String propertyId) async {
@@ -306,9 +421,10 @@ class ApiService {
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
-          ..clear()
-          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _localExpenses.removeWhere((e) =>
+          (propertyId == null || e['property_id'].toString() == propertyId) &&
+          (category == null || e['category'].toString().toLowerCase() == category.toLowerCase()));
+        _localExpenses.addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
         _persistExpenses();
         return list;
       }
@@ -325,36 +441,28 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> createExpense(Map<String, dynamic> data) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/finances/expenses'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 201) {
-        final exp = jsonDecode(res.body) as Map<String, dynamic>;
-        _localExpenses.insert(0, exp);
-        _persistExpenses();
-        return exp;
-      }
-    } catch (_) {}
-
-    final exp = Map<String, dynamic>.from(data);
-    exp['id'] = 'exp-${DateTime.now().millisecondsSinceEpoch}';
-    exp['created_at'] = DateTime.now().toIso8601String();
-    exp['expense_date'] = exp['expense_date'] ?? DateTime.now().toIso8601String().substring(0, 10);
+    final res = await http.post(
+      Uri.parse('$baseUrl/finances/expenses'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 201) {
+      throw Exception('Expense was not saved (server returned ${res.statusCode}).');
+    }
+    final exp = jsonDecode(res.body) as Map<String, dynamic>;
     _localExpenses.insert(0, exp);
     _persistExpenses();
     return exp;
   }
 
   static Future<void> deleteExpense(String expenseId) async {
-    try {
-      await http.delete(
-        Uri.parse('$baseUrl/finances/expenses/$expenseId'),
-        headers: _headers,
-      ).timeout(_timeout);
-    } catch (_) {}
+    final res = await http.delete(
+      Uri.parse('$baseUrl/finances/expenses/$expenseId'),
+      headers: _headers,
+    ).timeout(_timeout);
+    if (res.statusCode != 204) {
+      throw Exception('Expense was not deleted (server returned ${res.statusCode}).');
+    }
     _localExpenses.removeWhere((e) => e['id'].toString() == expenseId);
     _persistExpenses();
   }
@@ -403,6 +511,7 @@ class ApiService {
       "total_agent_commissions": commissions,
       "total_expenses": totalExp,
       "net_operating_profit": gross - totalExp - commissions,
+      "is_cached": true,
     };
   }
 
@@ -412,10 +521,10 @@ class ApiService {
       final res = await http.get(Uri.parse('$baseUrl/messages/threads'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
+        _localMessageThreads
           ..clear()
           ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        _persistExpenses();
+        _persistMessageThreads();
         return list;
       }
     } catch (_) {}
@@ -449,10 +558,11 @@ class ApiService {
       final res = await http.get(Uri.parse('$baseUrl/messages/threads/$threadId/messages'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
-          ..clear()
-          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        _persistExpenses();
+        final t = _localMessageThreads.firstWhere((th) => th['id'].toString() == threadId, orElse: () => {});
+        if (t.isNotEmpty) {
+          t['messages'] = list;
+          _persistMessageThreads();
+        }
         return list;
       }
     } catch (_) {}
@@ -499,31 +609,124 @@ class ApiService {
     return msg;
   }
 
-  // --- FILE UPLOADS ---
-  static Future<String> uploadImage(List<int> bytes, String filename) async {
+  // --- PRE-BUILT MESSAGE TEMPLATES (create / edit / copy / manage) ---
+  static Future<List<dynamic>> fetchMessageTemplates() async {
     try {
-      final uri = Uri.parse('$baseUrl/uploads/image');
-      final request = http.MultipartRequest('POST', uri);
-      request.headers.addAll({'X-Organization-Id': orgId});
-      request.files.add(
-        http.MultipartFile.fromBytes(
-          'file',
-          bytes,
-          filename: filename,
-        ),
-      );
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 10));
-      final response = await http.Response.fromStream(streamedResponse);
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final relativeUrl = data['url'] as String;
-        final hostRoot = baseUrl.replaceAll('/api/v1', '');
-        return relativeUrl.startsWith('http') ? relativeUrl : '$hostRoot$relativeUrl';
+      final res = await http.get(Uri.parse('$baseUrl/messages/templates'), headers: _headers).timeout(_timeout);
+      if (res.statusCode == 200) {
+        var list = (jsonDecode(res.body) as List<dynamic>);
+        // Cold start for a brand-new host: seed the curated starter library.
+        if (list.isEmpty) {
+          final seed = await http.post(Uri.parse('$baseUrl/messages/templates/seed'), headers: _headers).timeout(_timeout);
+          if (seed.statusCode == 200) {
+            list = (jsonDecode(seed.body) as List<dynamic>);
+          }
+        }
+        _localMessageTemplates
+          ..clear()
+          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
+        _persistMessageTemplates();
+        return list;
+      }
+    } catch (_) {}
+    return List<dynamic>.from(_localMessageTemplates);
+  }
+
+  static Future<Map<String, dynamic>> createMessageTemplate(Map<String, dynamic> data) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$baseUrl/messages/templates'),
+        headers: _headers,
+        body: jsonEncode(data),
+      ).timeout(_timeout);
+      if (res.statusCode == 201) {
+        final t = jsonDecode(res.body) as Map<String, dynamic>;
+        _localMessageTemplates.insert(0, t);
+        _persistMessageTemplates();
+        return t;
       }
     } catch (_) {}
 
-    // Offline / fallback image URL generator using data URI or secure asset placeholder
-    return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    final tpl = Map<String, dynamic>.from(data);
+    tpl['id'] = 'mtpl-${DateTime.now().millisecondsSinceEpoch}';
+    tpl['use_count'] = 0;
+    tpl['created_at'] = DateTime.now().toIso8601String();
+    tpl['updated_at'] = tpl['created_at'];
+    _localMessageTemplates.insert(0, tpl);
+    _persistMessageTemplates();
+    return tpl;
+  }
+
+  static Future<Map<String, dynamic>> updateMessageTemplate(String id, Map<String, dynamic> data) async {
+    try {
+      final res = await http.put(
+        Uri.parse('$baseUrl/messages/templates/$id'),
+        headers: _headers,
+        body: jsonEncode(data),
+      ).timeout(_timeout);
+      if (res.statusCode == 200) {
+        final updated = jsonDecode(res.body) as Map<String, dynamic>;
+        final idx = _localMessageTemplates.indexWhere((e) => e['id'].toString() == id);
+        if (idx >= 0) {
+          _localMessageTemplates[idx] = updated;
+        } else {
+          _localMessageTemplates.insert(0, updated);
+        }
+        _persistMessageTemplates();
+        return updated;
+      }
+    } catch (_) {}
+
+    final idx = _localMessageTemplates.indexWhere((e) => e['id'].toString() == id);
+    if (idx >= 0) {
+      _localMessageTemplates[idx] = {..._localMessageTemplates[idx], ...data, 'updated_at': DateTime.now().toIso8601String()};
+      _persistMessageTemplates();
+      return _localMessageTemplates[idx];
+    }
+    return {...data, 'id': id};
+  }
+
+  static Future<bool> deleteMessageTemplate(String id) async {
+    try {
+      final res = await http.delete(Uri.parse('$baseUrl/messages/templates/$id'), headers: _headers).timeout(_timeout);
+      if (res.statusCode == 204 || res.statusCode == 200) {
+        _localMessageTemplates.removeWhere((e) => e['id'].toString() == id);
+        _persistMessageTemplates();
+        return true;
+      }
+    } catch (_) {}
+    // Offline: still remove locally so the UI stays truthful to the host's intent.
+    _localMessageTemplates.removeWhere((e) => e['id'].toString() == id);
+    _persistMessageTemplates();
+    return true;
+  }
+
+  static Future<void> markMessageTemplateUsed(String id) async {
+    try {
+      final res = await http.post(Uri.parse('$baseUrl/messages/templates/$id/use'), headers: _headers).timeout(_timeout);
+      if (res.statusCode == 200) {
+        final updated = jsonDecode(res.body) as Map<String, dynamic>;
+        final idx = _localMessageTemplates.indexWhere((e) => e['id'].toString() == id);
+        if (idx >= 0) _localMessageTemplates[idx] = updated;
+        _persistMessageTemplates();
+      }
+    } catch (_) {}
+  }
+
+  // --- FILE UPLOADS ---
+  static Future<String> uploadImage(List<int> bytes, String filename) async {
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/uploads/image'));
+    request.headers.addAll({
+      if (authToken != null && authToken!.isNotEmpty) 'Authorization': 'Bearer $authToken',
+    });
+    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode != 201) {
+      throw Exception('Image could not be uploaded (${response.statusCode}).');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return Uri.parse(baseUrl).resolve(data['url'] as String).toString();
   }
 
   // --- HOST & ORGANIZATION PROFILE ---
@@ -531,28 +734,27 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse('$baseUrl/organization'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
+        _localOrganization = jsonDecode(res.body) as Map<String, dynamic>;
+        await _persistOrganization();
+        return Map<String, dynamic>.from(_localOrganization);
       }
     } catch (_) {}
     return Map<String, dynamic>.from(_localOrganization);
   }
 
   static Future<Map<String, dynamic>> updateOrganization(Map<String, dynamic> data) async {
-    try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/organization'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        final org = jsonDecode(res.body) as Map<String, dynamic>;
-        _localOrganization = org;
-        _persistOrganization();
-        return org;
-      }
-    } catch (_) {}
-    _localOrganization.addAll(data);
-    return Map<String, dynamic>.from(_localOrganization);
+    final res = await http.patch(
+      Uri.parse('$baseUrl/organization'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Host profile could not be saved (${res.statusCode}).');
+    }
+    final org = jsonDecode(res.body) as Map<String, dynamic>;
+    _localOrganization = org;
+    await _persistOrganization();
+    return org;
   }
 
   // --- RESERVATIONS ---
@@ -604,50 +806,18 @@ class ApiService {
       payload['guest_email'] = pg['email'];
       payload['guest_phone'] = pg['phone'];
     }
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/reservations'),
-        headers: _headers,
-        body: jsonEncode(payload),
-      ).timeout(_timeout);
-      if (res.statusCode == 201) {
-        final r = jsonDecode(res.body) as Map<String, dynamic>;
-        _localReservations.insert(0, r);
-        _persistReservations();
-        return r;
-      }
-    } catch (_) {}
-
-    // Local reservation creation with clean full structure
-    final r = Map<String, dynamic>.from(data);
-    final now = DateTime.now();
-    r['id'] = 'res-${now.millisecondsSinceEpoch}';
-    r['booking_reference'] = r['booking_reference'] ?? 'GIN-${now.year}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
-    r['created_at'] = now.toIso8601String();
-    r['reservation_status'] = r['reservation_status'] ?? 'confirmed';
-    r['payment_status'] = r['payment_status'] ?? 'unpaid';
-    r['guest_info_status'] = 'pending';
-    r['currency'] = 'KES';
-
-    final nightlyRate = double.tryParse(r['nightly_rate']?.toString() ?? '0') ?? 0.0;
-    final nights = int.tryParse(r['number_of_nights']?.toString() ?? '1') ?? 1;
-    final cleaning = double.tryParse(r['cleaning_fee']?.toString() ?? '0') ?? 0.0;
-    final service = double.tryParse(r['service_fee']?.toString() ?? '0') ?? 0.0;
-    final disc = double.tryParse(r['discount_amount']?.toString() ?? '0') ?? 0.0;
-    final total = (nightlyRate * nights) + cleaning + service - disc;
-
-    r['total_amount'] = total;
-    r['amount_paid'] = 0.0;
-    r['balance_due'] = total;
-
-    // Attach property details for display
-    final propId = r['property_id']?.toString();
-    final prop = _localProperties.firstWhere((p) => p['id'].toString() == propId, orElse: () => {});
-    r['property'] = prop.isNotEmpty ? prop : {'name': 'Estate Suite', 'city': 'Nairobi'};
-
-    _localReservations.insert(0, r);
-    _persistReservations();
-    return r;
+    final res = await http.post(
+      Uri.parse('$baseUrl/reservations'),
+      headers: _headers,
+      body: jsonEncode(payload),
+    ).timeout(_timeout);
+    if (res.statusCode != 201) {
+      throw Exception('Booking was not saved (${res.statusCode}). Check dates and booking details before retrying.');
+    }
+    final reservation = jsonDecode(res.body) as Map<String, dynamic>;
+    _localReservations.insert(0, reservation);
+    await _persistReservations();
+    return reservation;
   }
 
   static Future<Map<String, dynamic>> checkConflicts(Map<String, dynamic> data) async {
@@ -692,64 +862,54 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> updateReservation(String id, Map<String, dynamic> data) async {
-    try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/reservations/$id'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        final r = jsonDecode(res.body) as Map<String, dynamic>;
-        final idx = _localReservations.indexWhere((item) => item['id'].toString() == id);
-        if (idx != -1) {
-          _localReservations[idx] = r;
-        } else {
-          _localReservations.insert(0, r);
-        }
-        _persistReservations();
-        return r;
-      }
-    } catch (_) {}
-
+    final res = await http.patch(
+      Uri.parse('$baseUrl/reservations/$id'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Booking changes were not saved (${res.statusCode}).');
+    }
+    final reservation = jsonDecode(res.body) as Map<String, dynamic>;
     final idx = _localReservations.indexWhere((item) => item['id'].toString() == id);
     if (idx != -1) {
-      _localReservations[idx].addAll(data);
-      _persistReservations();
-      return _localReservations[idx];
+      _localReservations[idx] = reservation;
+    } else {
+      _localReservations.insert(0, reservation);
     }
-    return Map<String, dynamic>.from(data)..['id'] = id;
+    await _persistReservations();
+    return reservation;
   }
 
   static Future<Map<String, dynamic>> confirmReservation(String id) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/reservations/$id/confirm'),
-        headers: _headers,
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-
-    return updateReservation(id, {'reservation_status': 'confirmed'});
+    final res = await http.post(
+      Uri.parse('$baseUrl/reservations/$id/confirm'),
+      headers: _headers,
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Booking could not be confirmed (${res.statusCode}).');
+    }
+    final reservation = jsonDecode(res.body) as Map<String, dynamic>;
+    final idx = _localReservations.indexWhere((item) => item['id'].toString() == id);
+    if (idx != -1) _localReservations[idx] = reservation;
+    await _persistReservations();
+    return reservation;
   }
 
   static Future<Map<String, dynamic>> cancelReservation(String id, {String? reason}) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/reservations/$id/cancel'),
-        headers: _headers,
-        body: jsonEncode({'reason': reason}),
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-
-    return updateReservation(id, {
-      'reservation_status': 'cancelled',
-      'cancellation_reason': reason ?? 'Cancelled by host',
-    });
+    final res = await http.post(
+      Uri.parse('$baseUrl/reservations/$id/cancel'),
+      headers: _headers,
+      body: jsonEncode({'reason': reason}),
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Booking could not be cancelled (${res.statusCode}).');
+    }
+    final reservation = jsonDecode(res.body) as Map<String, dynamic>;
+    final idx = _localReservations.indexWhere((item) => item['id'].toString() == id);
+    if (idx != -1) _localReservations[idx] = reservation;
+    await _persistReservations();
+    return reservation;
   }
 
   static Future<Map<String, dynamic>?> fetchFinancialTimeline(String reservationId) async {
@@ -819,10 +979,10 @@ class ApiService {
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
+        _localSubmissions
           ..clear()
           ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        _persistExpenses();
+        _persistSubmissions();
         return list;
       }
     } catch (_) {}
@@ -921,156 +1081,70 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> createInvoice(String reservationId, Map<String, dynamic> data) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/reservations/$reservationId/invoices'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 201) {
-        final inv = jsonDecode(res.body) as Map<String, dynamic>;
-        _localInvoices.insert(0, inv);
-        _persistInvoices();
-        return inv;
-      }
-    } catch (_) {}
-
-    // Find the reservation or fallback
-    final r = _localReservations.firstWhere(
-      (res) => res['id'].toString() == reservationId,
-      orElse: () => {
-        'id': reservationId,
-        'booking_reference': 'GIN-RES',
-        'total_amount': 25000.0,
-        'number_of_nights': 1,
-        'nightly_rate': 25000.0,
-        'property': {'name': 'Residence Suite'},
-        'primary_guest': {'first_name': 'Valued', 'last_name': 'Guest'},
-      },
-    );
-
-    final guest = r['primary_guest'] ?? {};
-    final guestName = '${guest['first_name'] ?? ''} ${guest['last_name'] ?? ''}'.trim();
-    final prop = r['property'] ?? {};
-    final now = DateTime.now();
-    final docType = data['document_type'] ?? 'invoice';
-    final invNum = 'GIN-${docType == 'quotation' ? 'QUO' : 'INV'}-${now.year}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}';
-
-    final totalAmt = double.tryParse(r['total_amount']?.toString() ?? '25000') ?? 25000.0;
-    final nights = int.tryParse(r['number_of_nights']?.toString() ?? '1') ?? 1;
-    final rate = double.tryParse(r['nightly_rate']?.toString() ?? '$totalAmt') ?? totalAmt;
-
-    final newInv = <String, dynamic>{
-      'id': 'inv-${now.millisecondsSinceEpoch}',
-      'reservation_id': reservationId,
-      'invoice_number': invNum,
-      'document_type': docType,
-      'status': 'draft',
-      'issue_date': now.toIso8601String().substring(0, 10),
-      'due_date': now.add(const Duration(days: 7)).toIso8601String().substring(0, 10),
-      'currency': 'KES',
-      'supplier_name': _localOrganization['name'] ?? 'Ginata Property Management',
-      'billing_name': guestName.isNotEmpty ? guestName : 'Valued Guest',
-      'billing_email': guest['email'] ?? '',
-      'billing_phone': guest['phone'] ?? '',
-      'billing_company_name': '',
-      'billing_company_address': '',
-      'payment_terms': 'Payment due upon invoice receipt via M-Pesa or Bank Wire.',
-      'notes': 'Stay at ${prop['name'] ?? 'Estate'} for $nights nights. Direct rate with 0.00% VAT.',
-      'subtotal': totalAmt,
-      'discount_total': 0.0,
-      'tax_total': 0.0,
-      'grand_total': totalAmt,
-      'amount_paid': double.tryParse(r['amount_paid']?.toString() ?? '0') ?? 0.0,
-      'balance_due': double.tryParse(r['balance_due']?.toString() ?? '$totalAmt') ?? totalAmt,
-      'line_items': [
-        {
-          'description': 'Accommodation: ${prop['name'] ?? 'Estate Suite'} ($nights Nights)',
-          'quantity': nights,
-          'unit_price': rate,
-          'tax_rate': 0.0,
-          'discount_amount': 0.0,
-          'total_amount': totalAmt,
-        }
-      ],
-    };
-
-    _localInvoices.insert(0, newInv);
-    _persistInvoices();
-    return newInv;
+    final res = await http.post(
+      Uri.parse('$baseUrl/reservations/$reservationId/invoices'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 201) {
+      throw Exception('Invoice could not be created (${res.statusCode}).');
+    }
+    final inv = jsonDecode(res.body) as Map<String, dynamic>;
+    _localInvoices.insert(0, inv);
+    await _persistInvoices();
+    return inv;
   }
 
   static Future<Map<String, dynamic>> updateInvoice(String id, Map<String, dynamic> data) async {
-    try {
-      final payload = Map<String, dynamic>.from(data)..['force_edit'] = true;
-      final res = await http.patch(
-        Uri.parse('$baseUrl/invoices/$id'),
-        headers: _headers,
-        body: jsonEncode(payload),
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        final inv = jsonDecode(res.body) as Map<String, dynamic>;
-        final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
-        if (idx != -1) _localInvoices[idx] = inv;
-        _persistInvoices();
-        return inv;
-      }
-    } catch (_) {}
-
-    final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
-    if (idx != -1) {
-      _localInvoices[idx].addAll(data);
-      _persistInvoices();
-      return _localInvoices[idx];
+    final payload = Map<String, dynamic>.from(data)..['force_edit'] = true;
+    final res = await http.patch(
+      Uri.parse('$baseUrl/invoices/$id'),
+      headers: _headers,
+      body: jsonEncode(payload),
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Invoice changes could not be saved (${res.statusCode}).');
     }
-    return Map<String, dynamic>.from(data)..['id'] = id;
+    final inv = jsonDecode(res.body) as Map<String, dynamic>;
+    final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
+    if (idx != -1) _localInvoices[idx] = inv;
+    await _persistInvoices();
+    return inv;
   }
 
   static Future<Map<String, dynamic>> issueInvoice(String id) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/invoices/$id/issue'),
-        headers: _headers,
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        final inv = jsonDecode(res.body) as Map<String, dynamic>;
-        final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
-        if (idx != -1) _localInvoices[idx] = inv;
-        _persistInvoices();
-        return inv;
-      }
-    } catch (_) {}
-
-    final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
-    if (idx != -1) {
-      _localInvoices[idx]['status'] = 'issued';
-      _localInvoices[idx]['issued_at'] = DateTime.now().toIso8601String();
-      _persistInvoices();
-      return _localInvoices[idx];
+    final res = await http.post(
+      Uri.parse('$baseUrl/invoices/$id/issue'),
+      headers: _headers,
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Invoice could not be issued (${res.statusCode}).');
     }
-    return {'id': id, 'status': 'issued'};
+    final inv = jsonDecode(res.body) as Map<String, dynamic>;
+    final idx = _localInvoices.indexWhere((item) => item['id'].toString() == id);
+    if (idx != -1) _localInvoices[idx] = inv;
+    await _persistInvoices();
+    return inv;
   }
 
   static Future<Map<String, dynamic>> exportInvoice(String id, String format) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/invoices/$id/export'),
-        headers: _headers,
-        body: jsonEncode({'format': format}),
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
+    final res = await http.post(
+      Uri.parse('$baseUrl/invoices/$id/export'),
+      headers: _headers,
+      body: jsonEncode({'format': format}),
+    ).timeout(const Duration(seconds: 45));
+    if (res.statusCode == 200) {
+      final doc = jsonDecode(res.body) as Map<String, dynamic>;
+      final idx = _localDocuments.indexWhere((d) => d['id'].toString() == doc['id'].toString());
+      if (idx != -1) {
+        _localDocuments[idx] = doc;
+      } else {
+        _localDocuments.insert(0, doc);
       }
-    } catch (_) {}
-
-    final inv = _localInvoices.firstWhere((item) => item['id'].toString() == id, orElse: () => {});
-    final invNo = inv['invoice_number'] ?? 'INV-$id';
-    return {
-      'file_name': '$invNo.${format.toLowerCase()}',
-      'file_size': 12480,
-      'secure_token': 'sec-token-${DateTime.now().millisecondsSinceEpoch}',
-      'format': format,
-    };
+      _persistDocuments();
+      return doc;
+    }
+    throw Exception('Could not export the invoice (server returned ${res.statusCode}). Check your connection and try again.');
   }
 
   static Future<Map<String, dynamic>> sendInvoice(String id, String channel, String recipient, {String? message}) async {
@@ -1106,86 +1180,52 @@ class ApiService {
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
+        _localPayments
           ..clear()
           ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        _persistExpenses();
+        _persistPayments();
         return list;
       }
     } catch (_) {}
-    return [];
+    if (reservationId != null) {
+      return _localPayments.where((p) => p['reservation_id'].toString() == reservationId).toList();
+    }
+    return List<dynamic>.from(_localPayments);
   }
 
   static Future<Map<String, dynamic>> recordPayment(Map<String, dynamic> data) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/payments'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 201) {
-        final payData = jsonDecode(res.body) as Map<String, dynamic>;
-        // Update local reservation cache with new payment info
-        final resId = data['reservation_id']?.toString();
-        if (resId != null) {
-          try {
-            final resRes = await http.get(
-              Uri.parse('$baseUrl/reservations/$resId'),
-              headers: _headers,
-            ).timeout(_timeout);
-            if (resRes.statusCode == 200) {
-              final updatedRes = jsonDecode(resRes.body) as Map<String, dynamic>;
-              final idx = _localReservations.indexWhere((r) => r['id'].toString() == resId);
-              if (idx != -1) _localReservations[idx] = updatedRes;
-            }
-          } catch (_) {}
-        }
-        return payData;
-      }
-    } catch (_) {}
-
-    // Record locally
-    final resId = data['reservation_id']?.toString();
-    final amount = double.tryParse(data['amount']?.toString() ?? '0') ?? 0.0;
-    final now = DateTime.now();
-
-    final rIdx = _localReservations.indexWhere((res) => res['id'].toString() == resId);
-    if (rIdx != -1) {
-      final currentPaid = double.tryParse(_localReservations[rIdx]['amount_paid']?.toString() ?? '0') ?? 0.0;
-      final total = double.tryParse(_localReservations[rIdx]['total_amount']?.toString() ?? '0') ?? 0.0;
-      final newPaid = currentPaid + amount;
-      final newBal = (total - newPaid) > 0 ? (total - newPaid) : 0.0;
-
-      _localReservations[rIdx]['amount_paid'] = newPaid;
-      _localReservations[rIdx]['balance_due'] = newBal;
-      _localReservations[rIdx]['payment_status'] = newBal <= 0 ? 'paid' : 'partially_paid';
-
-      for (final inv in _localInvoices) {
-        if (inv['reservation_id']?.toString() == resId) {
-          inv['amount_paid'] = newPaid;
-          inv['balance_due'] = newBal;
-          inv['status'] = newBal <= 0 ? 'paid' : 'partially_paid';
-        }
-      }
+    final res = await http.post(
+      Uri.parse('$baseUrl/payments'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 201) {
+      throw Exception('Payment was not recorded (${res.statusCode}). Refresh the reservation before retrying.');
     }
-
-    final rec = {
-      'id': 'rec-${now.millisecondsSinceEpoch}',
-      'reservation_id': resId,
-      'receipt_number': 'GIN-REC-${now.year}-${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4, '0')}',
-      'receipt_date': now.toIso8601String().substring(0, 10),
-      'amount_received': amount,
-      'payment_method': data['payment_method'] ?? 'mpesa',
-      'transaction_reference': data['transaction_reference'] ?? 'MPESA-TX',
-      'issued_to_name': data['payer_name'] ?? 'Guest',
-      'issued_by_name': 'Host',
-      'remaining_balance': rIdx != -1 ? (_localReservations[rIdx]['balance_due'] ?? 0.0) : 0.0,
-    };
-    _localReceipts.insert(0, rec);
-    _persistReceipts();
-    _persistReservations();
-    _persistInvoices();
-    return rec;
+    final payData = jsonDecode(res.body) as Map<String, dynamic>;
+    _localPayments.insert(0, payData);
+    await _persistPayments();
+    final receipt = payData['receipt'];
+    if (receipt is Map) {
+      _localReceipts.insert(0, Map<String, dynamic>.from(receipt));
+      await _persistReceipts();
+    }
+    final resId = data['reservation_id']?.toString();
+    if (resId != null) {
+      try {
+        final resRes = await http.get(
+          Uri.parse('$baseUrl/reservations/$resId'),
+          headers: _headers,
+        ).timeout(_timeout);
+        if (resRes.statusCode == 200) {
+          final updatedRes = jsonDecode(resRes.body) as Map<String, dynamic>;
+          final idx = _localReservations.indexWhere((r) => r['id'].toString() == resId);
+          if (idx != -1) _localReservations[idx] = updatedRes;
+          await _persistReservations();
+        }
+      } catch (_) {}
+    }
+    return payData;
   }
 
   static Future<List<dynamic>> fetchReceipts({String? reservationId}) async {
@@ -1207,42 +1247,62 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> updateReceipt(String id, Map<String, dynamic> data) async {
-    try {
-      final res = await http.patch(
-        Uri.parse('$baseUrl/payments/receipts/$id'),
-        headers: _headers,
-        body: jsonEncode(data),
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-
-    final idx = _localReceipts.indexWhere((r) => r['id'].toString() == id);
-    if (idx != -1) {
-      _localReceipts[idx].addAll(data);
-      return _localReceipts[idx];
+    final res = await http.patch(
+      Uri.parse('$baseUrl/payments/receipts/$id'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Receipt changes could not be saved (${res.statusCode}).');
     }
-    return Map<String, dynamic>.from(data)..['id'] = id;
+    final receipt = jsonDecode(res.body) as Map<String, dynamic>;
+    final idx = _localReceipts.indexWhere((r) => r['id'].toString() == id);
+    if (idx != -1) _localReceipts[idx] = receipt;
+    await _persistReceipts();
+    return receipt;
   }
 
   static Future<Map<String, dynamic>> exportReceipt(String receiptId) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/payments/receipts/$receiptId/export'),
-        headers: _headers,
-      ).timeout(_timeout);
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
+    final res = await http.post(
+      Uri.parse('$baseUrl/payments/receipts/$receiptId/export'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 45));
+    if (res.statusCode == 200) {
+      final doc = jsonDecode(res.body) as Map<String, dynamic>;
+      final idx = _localDocuments.indexWhere((d) => d['id'].toString() == doc['id'].toString());
+      if (idx != -1) {
+        _localDocuments[idx] = doc;
+      } else {
+        _localDocuments.insert(0, doc);
       }
-    } catch (_) {}
+      _persistDocuments();
+      return doc;
+    }
+    throw Exception('Could not export the receipt (server returned ${res.statusCode}). Check your connection and try again.');
+  }
 
-    return {
-      'file_name': 'GIN-REC-$receiptId.pdf',
-      'file_size': 8540,
-      'secure_token': 'rec-token-${DateTime.now().millisecondsSinceEpoch}',
-      'format': 'pdf',
-    };
+  /// Downloads raw file bytes from an API path (e.g. /documents/{id}/download)
+  /// using the authenticated session. Used by the in-app PDF viewer and saver.
+  static Future<Uint8List> downloadBytes(String apiPath) async {
+    final url = apiPath.startsWith('http') ? apiPath : '$baseUrl$apiPath';
+    final res = await http.get(Uri.parse(url), headers: _headers).timeout(const Duration(seconds: 45));
+    if (res.statusCode == 200) {
+      return res.bodyBytes;
+    }
+    throw Exception('Download failed (server returned ${res.statusCode}).');
+  }
+
+  /// Downloads the expenses ledger as a real CSV file from the server.
+  static Future<Uint8List> downloadExpensesCsv({String? propertyId, String? category}) async {
+    final params = <String, String>{};
+    if (propertyId != null) params['property_id'] = propertyId;
+    if (category != null && category != 'All') params['category'] = category;
+    final uri = Uri.parse('$baseUrl/finances/expenses/export').replace(queryParameters: params.isNotEmpty ? params : null);
+    final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 45));
+    if (res.statusCode == 200) {
+      return res.bodyBytes;
+    }
+    throw Exception('Could not export expenses (server returned ${res.statusCode}).');
   }
 
   // --- TEMPLATES ---
@@ -1251,28 +1311,72 @@ class ApiService {
       final res = await http.get(Uri.parse('$baseUrl/templates'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
+        _localTemplates
           ..clear()
           ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        _persistExpenses();
+        _persistTemplates();
         return list;
       }
     } catch (_) {}
-    return [];
+    return List<dynamic>.from(_localTemplates);
   }
 
   static Future<Map<String, dynamic>> updateTemplate(String id, Map<String, dynamic> data) async {
-    try {
       final res = await http.patch(
         Uri.parse('$baseUrl/templates/$id'),
         headers: _headers,
         body: jsonEncode(data),
       ).timeout(_timeout);
       if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
+        final tpl = jsonDecode(res.body) as Map<String, dynamic>;
+        final idx = _localTemplates.indexWhere((t) => t['id'].toString() == id);
+        if (idx != -1) {
+          _localTemplates[idx] = tpl;
+        } else {
+          _localTemplates.add(tpl);
+        }
+        _persistTemplates();
+        return tpl;
       }
-    } catch (_) {}
-    return Map<String, dynamic>.from(data)..['id'] = id;
+    throw Exception('Could not save the document design (server returned ${res.statusCode}).');
+  }
+
+  static Future<Map<String, dynamic>> createTemplate(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/templates'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode == 201 || res.statusCode == 200) {
+      final tpl = jsonDecode(res.body) as Map<String, dynamic>;
+      _localTemplates.add(tpl);
+      _persistTemplates();
+      return tpl;
+    }
+    throw Exception('Could not create template (server returned ${res.statusCode}).');
+  }
+
+  /// Applies a template's layout/typography to all existing invoices & receipts
+  /// by regenerating their archived documents on the server.
+  static Future<Uint8List> previewDocumentTemplate(Map<String, dynamic> design) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/templates/preview'),
+      headers: _headers,
+      body: jsonEncode(design),
+    ).timeout(const Duration(seconds: 45));
+    if (res.statusCode == 200) return res.bodyBytes;
+    throw Exception('Could not preview design (server returned ${res.statusCode}).');
+  }
+
+  static Future<Map<String, dynamic>> applyTemplateToDocuments(String templateId) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/templates/$templateId/apply'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 60));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception('Could not apply template (server returned ${res.statusCode}).');
   }
 
   // --- DOCUMENTS ARCHIVE ---
@@ -1285,14 +1389,14 @@ class ApiService {
       final res = await http.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
+        _localDocuments
           ..clear()
           ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        _persistExpenses();
+        _persistDocuments();
         return list;
       }
     } catch (_) {}
-    return [];
+    return List<dynamic>.from(_localDocuments);
   }
 
   // --- AUDIT LOGS ---
@@ -1300,12 +1404,7 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse('$baseUrl/audit-logs'), headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
-        final list = jsonDecode(res.body) as List<dynamic>;
-        _localExpenses
-          ..clear()
-          ..addAll(list.map((e) => Map<String, dynamic>.from(e as Map)));
-        _persistExpenses();
-        return list;
+        return jsonDecode(res.body) as List<dynamic>;
       }
     } catch (_) {}
     return [];

@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
@@ -42,11 +43,17 @@ def authorized_download(
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    file_path, file_name, media_type = get_secure_download_file(db, doc.secure_token)
+    if not Path(doc.file_path).is_file():
+        raise HTTPException(status_code=404, detail="File not found on storage")
+    media_types = {
+        'pdf': 'application/pdf',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'csv': 'text/csv',
+    }
     return FileResponse(
-        path=file_path,
-        filename=file_name,
-        media_type=media_type
+        path=doc.file_path,
+        filename=doc.file_name,
+        media_type=media_types.get(doc.file_format, 'application/octet-stream'),
     )
 
 @router.get("/public/documents/{token}/download")

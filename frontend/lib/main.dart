@@ -55,8 +55,12 @@ class _AppEntryPointState extends State<AppEntryPoint> {
 
   Future<void> _checkAuth() async {
     final loggedIn = await AuthService.isLoggedIn();
+    bool valid = loggedIn;
+    if (loggedIn) {
+      valid = await AuthService.validateSession();
+    }
     if (mounted) {
-      setState(() => _isLoggedIn = loggedIn);
+      setState(() => _isLoggedIn = valid);
     }
   }
 
@@ -180,7 +184,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   physics: const BouncingScrollPhysics(),
                   children: [
                     _moreMenuItem(Icons.account_balance_wallet_outlined, 'Finances & Expenses', 'Net profit, house expenses & cash collected', 4, ctx),
-                    _moreMenuItem(Icons.forum_outlined, 'Guest Messages', 'Multi-channel guest inbox & direct messaging', 5, ctx),
+                    _moreMenuItem(Icons.text_snippet_outlined, 'Message Templates', 'Pre-built guest messages for Airbnb & more', 5, ctx),
                     _moreMenuItem(Icons.how_to_reg_outlined, 'Guest Registration Forms', 'Google Forms sync & guest agreements', 6, ctx),
                     _moreMenuItem(Icons.receipt_long_outlined, 'Invoice Studio', 'Generate guest receipts, invoices & vouchers', 7, ctx),
                     _moreMenuItem(Icons.person_outline, 'Host Profile & Settings', 'Edit host info, contacts, payout instructions', 8, ctx),
@@ -343,7 +347,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
   Widget _buildMoreNavItem(bool isSelected) {
     String label = 'More';
     if (_currentIndex == 4) label = 'Finances';
-    if (_currentIndex == 5) label = 'Messages';
+    if (_currentIndex == 5) label = 'Templates';
     if (_currentIndex == 6) label = 'Forms';
     if (_currentIndex == 7) label = 'Studio';
     if (_currentIndex == 8) label = 'Profile';

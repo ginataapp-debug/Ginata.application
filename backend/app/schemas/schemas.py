@@ -736,3 +736,73 @@ class MessageThreadResponse(MessageThreadBase, OrmModel):
     last_message_at: datetime
     created_at: datetime
     messages: List[MessageResponse] = []
+
+
+# Pre-built / reusable message templates (Airbnb, Booking.com, WhatsApp, ...)
+class MessageTemplateBase(BaseModel):
+    title: str
+    category: str = "general"  # airbnb, booking_com, whatsapp, sms, email, general
+    body: str
+    variables: Optional[List[str]] = None
+    is_active: bool = True
+
+class MessageTemplateCreate(MessageTemplateBase):
+    pass
+
+class MessageTemplateUpdate(BaseModel):
+    title: Optional[str] = None
+    category: Optional[str] = None
+    body: Optional[str] = None
+    variables: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+class MessageTemplateResponse(MessageTemplateBase, OrmModel):
+    id: str
+    organization_id: str
+    use_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+# Host Authentication Schemas
+class HostSignUpRequest(BaseModel):
+    full_name: str = Field(min_length=1, max_length=200, pattern=r"\S")
+    email: EmailStr = Field(max_length=255)
+    password: str = Field(min_length=10, max_length=1024)
+    phone: Optional[str] = None
+    organization_name: Optional[str] = None
+
+class HostLoginRequest(BaseModel):
+    email: EmailStr = Field(max_length=255)
+    password: str = Field(min_length=1, max_length=1024)
+
+class HostVerificationSendRequest(HostLoginRequest):
+    pass
+
+class HostVerificationRequest(BaseModel):
+    email: EmailStr = Field(max_length=255)
+    code: str = Field(pattern=r"^[0-9]{6}$")
+
+class HostUserResponse(OrmModel):
+    id: str
+    organization_id: str
+    email: str
+    full_name: str
+    phone: Optional[str] = None
+    is_active: bool
+    is_verified: bool
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+
+class HostAuthResponse(BaseModel):
+    success: bool
+    token: Optional[str] = None
+    verification_required: bool = False
+    host: HostUserResponse
+    organization_id: str
+    message: str
+
+class HostProfileUpdateRequest(BaseModel):
+    full_name: Optional[str] = Field(default=None, min_length=1, max_length=200, pattern=r"\S")
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = Field(default=None, max_length=255)

@@ -181,7 +181,21 @@ def setup_db():
         db.commit()
     finally:
         db.close()
+
+    # Authenticate the seeded host so org-scoped endpoints resolve the tenant
+    # from a valid session token (the app now requires Bearer auth).
+    login_res = client.post(
+        "/api/v1/auth/login",
+        json={"email": "host@ginata.ke", "password": "host123456"},
+    )
+    assert login_res.status_code == 200, login_res.text
+    token = login_res.json()["token"]
+    client.headers.update({
+        "Authorization": f"Bearer {token}",
+        "X-Organization-ID": settings.DEFAULT_ORG_ID,
+    })
     yield
+    client.headers.pop("Authorization", None)
 
 # 1. Manual booking creation and updates
 def test_manual_booking_creation_and_update():
@@ -431,9 +445,20 @@ def test_guest_form_honeypot_spam_rejection():
 
 # 6. Tenant isolation and authorization
 def test_tenant_isolation():
-    # Query with non-existent or foreign organization ID -> should be forbidden
+    # The tenant is derived from the authenticated host, so a foreign org header
+    # is ignored and the host only ever sees their own organization's data.
     res = client.get("/api/v1/reservations", headers={"X-Organization-ID": "foreign-unauthorized-org"})
-    assert res.status_code == 403
+    assert res.status_code == 200
+    for r in res.json():
+        assert r["organization_id"] == settings.DEFAULT_ORG_ID
+
+    # No session token -> unauthorized.
+    no_auth = client.get("/api/v1/reservations", headers={"Authorization": ""})
+    assert no_auth.status_code == 401
+
+    # Invalid / revoked token -> unauthorized.
+    bad_auth = client.get("/api/v1/reservations", headers={"Authorization": "Bearer not-a-real-token"})
+    assert bad_auth.status_code == 401
 
 # 7. Invoice calculations, company billing details, and issuance
 def test_invoice_calculations_and_issuance():
@@ -604,6 +629,9 @@ def test_secure_download_expiry_and_revocation():
     # Public download after revocation -> MUST RETURN 410 GONE
     dl_revoked = client.get(f"/api/v1/public/documents/{token}/download")
     assert dl_revoked.status_code == 410
+    owner_download = client.get(f"/api/v1/documents/{doc_meta['id']}/download")
+    assert owner_download.status_code == 200
+    assert len(pypdf.PdfReader(io.BytesIO(owner_download.content)).pages) >= 1
 
 # 12. Delivery attempt logging (Email and WhatsApp)
 def test_document_delivery_logging():
@@ -626,3 +654,219 @@ def test_document_delivery_logging():
     assert send_invalid.status_code == 200
     assert send_invalid.json()["status"] == "failed"
     assert "Invalid email" in send_invalid.json()["error_message"]
+
+
+def test_message_templates_seed_and_crud():
+    # Fresh host starts with an empty library.
+    empty = client.get("/api/v1/messages/templates")
+    assert empty.status_code == 200, empty.text
+    assert empty.json() == []
+
+    # Seeding loads the curated starter library and extracts {{variables}}.
+    seeded = client.post("/api/v1/messages/templates/seed")
+    assert seeded.status_code == 200, seeded.text
+    library = seeded.json()
+    assert len(library) >= 6
+    welcome = next(t for t in library if t["category"] == "airbnb")
+    assert "guest_name" in welcome["variables"]
+    assert welcome["use_count"] == 0
+
+    # Seeding is idempotent — never clobbers the host's library.
+    again = client.post("/api/v1/messages/templates/seed").json()
+    assert len(again) == len(library)
+
+    # Create a custom template; variables are derived from the body.
+    created = client.post("/api/v1/messages/templates", json={
+        "title": "Late arrival notice",
+        "category": "WhatsApp",  # normalized to lowercase on save
+        "body": "Hi {{guest_name}}, running late — arrive by {{eta}}. Code {{door_code}}.",
+    })
+    assert created.status_code == 201, created.text
+    tpl = created.json()
+    tpl_id = tpl["id"]
+    assert tpl["category"] == "whatsapp"
+    assert tpl["variables"] == ["guest_name", "eta", "door_code"]
+
+    # Update body re-derives variables.
+    updated = client.put(f"/api/v1/messages/templates/{tpl_id}", json={
+        "body": "Hello {{guest_name}}, your gate code is {{door_code}}.",
+        "is_active": False,
+    })
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["variables"] == ["guest_name", "door_code"]
+    assert updated.json()["is_active"] is False
+
+    # Marking used increments the copy counter.
+    used = client.post(f"/api/v1/messages/templates/{tpl_id}/use")
+    assert used.status_code == 200, used.text
+    assert used.json()["use_count"] == 1
+
+    # Delete removes it.
+    deleted = client.delete(f"/api/v1/messages/templates/{tpl_id}")
+    assert deleted.status_code == 204
+    remaining = client.get("/api/v1/messages/templates").json()
+    assert all(t["id"] != tpl_id for t in remaining)
+
+
+def test_document_template_theming_changes_pdf():
+    """Layout/typography/color settings must visibly change the rendered PDF."""
+    db = SessionLocal()
+    try:
+        invoice = db.query(Invoice).first()
+
+        default_pdf = generate_invoice_pdf(invoice)
+        assert len(default_pdf) > 1000
+        assert len(pypdf.PdfReader(io.BytesIO(default_pdf)).pages) >= 1
+
+        serif_tpl = DocumentTemplate(
+            layout_style="classic_monograph",
+            font_family="Playfair Display",  # -> Times serif family
+            primary_color="#123456",
+            secondary_color="#654321",
+        )
+        band_tpl = DocumentTemplate(
+            layout_style="modern_corporate",
+            font_family="Courier",  # -> mono family
+            primary_color="#003329",
+            secondary_color="#466557",
+        )
+        serif_pdf = generate_invoice_pdf(invoice, template=serif_tpl)
+        band_pdf = generate_invoice_pdf(invoice, template=band_tpl)
+
+        for pdf_bytes, expected_font in [
+            (default_pdf, '/Helvetica'),
+            (serif_pdf, '/Times-Roman'),
+            (band_pdf, '/Courier'),
+        ]:
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            fonts = {
+                font.get_object()['/BaseFont']
+                for page in reader.pages
+                for font in page['/Resources']['/Font'].get_object().values()
+            }
+            assert expected_font in fonts
+        assert serif_pdf != default_pdf
+        assert band_pdf != default_pdf
+        assert serif_pdf != band_pdf
+    finally:
+        db.close()
+
+
+def test_apply_template_regenerates_archived_documents():
+    """The apply endpoint promotes the template and re-renders stored PDFs."""
+    invoices = client.get("/api/v1/invoices").json()
+    inv_id = invoices[0]["id"]
+
+    # Archive a PDF first so there is an existing generated document to refresh.
+    exp = client.post(f"/api/v1/invoices/{inv_id}/export", json={"format": "pdf"})
+    assert exp.status_code == 200, exp.text
+    doc_id = exp.json()["id"]
+
+    templates = client.get("/api/v1/templates").json()
+    assert templates, "expected a default template"
+    tpl_id = templates[0]["id"]
+
+    # Change the look, then apply it to current invoices & receipts.
+    patched = client.patch(f"/api/v1/templates/{tpl_id}", json={
+        "layout_style": "modern_corporate",
+        "font_family": "Playfair Display",
+        "primary_color": "#0B3D2E",
+        "secondary_color": "#B89758",
+    })
+    assert patched.status_code == 200, patched.text
+
+    applied = client.post(f"/api/v1/templates/{tpl_id}/apply")
+    assert applied.status_code == 200, applied.text
+    body = applied.json()
+    assert body["status"] == "applied"
+    assert body["template_id"] == tpl_id
+    assert body["documents_regenerated"] >= 1
+
+    # The archived document version was bumped by the regeneration.
+    db = SessionLocal()
+    try:
+        doc = db.query(GeneratedDocument).filter(GeneratedDocument.id == doc_id).first()
+        assert doc is not None
+        assert doc.version >= 2
+        assert doc.file_size > 1000
+        with open(doc.file_path, 'rb') as saved:
+            assert len(pypdf.PdfReader(saved).pages) >= 1
+    finally:
+        db.close()
+
+    downloaded = client.get(f'/api/v1/documents/{doc_id}/download')
+    assert downloaded.status_code == 200
+    assert len(pypdf.PdfReader(io.BytesIO(downloaded.content)).pages) >= 1
+
+
+def test_document_preview_is_real_pdf_and_does_not_create_archive():
+    before = client.get('/api/v1/documents').json()
+    result = client.post('/api/v1/templates/preview', json={
+        'layout_style': 'modern_corporate',
+        'font_family': 'Courier',
+        'header_text': 'Host & Company',
+        'primary_color': '#003329',
+        'secondary_color': '#466557',
+    })
+    assert result.status_code == 200, result.text
+    reader = pypdf.PdfReader(io.BytesIO(result.content))
+    text = '\n'.join(page.extract_text() for page in reader.pages)
+    assert '103,000.00' in text
+    assert client.get('/api/v1/documents').json() == before
+
+
+def test_financial_summary_and_expense_filters():
+    properties = client.get('/api/v1/properties').json()
+    property_id = properties[0]['id']
+    before = client.get('/api/v1/finances/summary', params={'property_id': property_id}).json()
+    created = client.post('/api/v1/finances/expenses', json={
+        'property_id': property_id, 'title': '=1+1',
+        'category': 'Maintenance', 'amount': '1500.25', 'payment_method': 'mpesa',
+    })
+    assert created.status_code == 201, created.text
+    for category in ['maintenance', 'Maintenance']:
+        ledger = client.get('/api/v1/finances/expenses', params={'property_id': property_id, 'category': category})
+        assert any(e['id'] == created.json()['id'] for e in ledger.json())
+        exported = client.get('/api/v1/finances/expenses/export', params={'property_id': property_id, 'category': category})
+        assert exported.status_code == 200
+        assert '1500.25' in exported.text
+        assert "'=1+1" in exported.text
+    after = client.get('/api/v1/finances/summary', params={'property_id': property_id}).json()
+    assert after['total_expenses'] == pytest.approx(before['total_expenses'] + 1500.25)
+    assert after['net_operating_profit'] == pytest.approx(after['gross_revenue'] - after['total_agent_commissions'] - after['total_expenses'])
+    invalid = client.post('/api/v1/finances/expenses', json={
+        'property_id': property_id, 'title': 'Invalid', 'amount': '-1',
+    })
+    assert invalid.status_code == 422
+    unknown_property = client.post('/api/v1/finances/expenses', json={
+        'property_id': 'another-host-property', 'title': 'Invalid', 'amount': '500',
+    })
+    assert unknown_property.status_code == 404
+
+
+def test_cover_image_upload_is_authenticated_and_served_from_storage():
+    from PIL import Image
+
+    output = io.BytesIO()
+    Image.new('RGB', (2, 2), color='green').save(output, format='PNG')
+    image_bytes = output.getvalue()
+    unauthorized = client.post('/api/v1/uploads/image',
+        files={'file': ('cover.png', image_bytes, 'image/png')},
+        headers={'Authorization': ''})
+    assert unauthorized.status_code == 401
+    invalid = client.post('/api/v1/uploads/image',
+        files={'file': ('cover.png', b'not an image', 'image/png')})
+    assert invalid.status_code == 400
+    uploaded = client.post('/api/v1/uploads/image',
+        files={'file': ('cover.png', image_bytes, 'image/png')})
+    assert uploaded.status_code == 201, uploaded.text
+    payload = uploaded.json()
+    path = settings.UPLOADS_DIR / payload['filename']
+    try:
+        assert path.read_bytes() == image_bytes
+        assert payload['filename'].startswith(settings.DEFAULT_ORG_ID)
+        served = client.get(payload['url'])
+        assert served.status_code == 200
+        assert served.content == image_bytes
+    finally:
+        path.unlink(missing_ok=True)

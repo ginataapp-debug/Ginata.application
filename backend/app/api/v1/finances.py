@@ -23,7 +23,7 @@ def list_expenses(
     if property_id:
         query = query.where(Expense.property_id == property_id)
     if category:
-        query = query.where(Expense.category == category)
+        query = query.where(func.lower(Expense.category) == category.lower())
     query = query.order_by(Expense.expense_date.desc(), Expense.created_at.desc())
     return db.execute(query).scalars().all()
 
@@ -34,12 +34,27 @@ def create_expense(
     db: Session = Depends(get_db),
     org_id: str = Depends(get_current_org_id)
 ):
+    prop = db.execute(select(Property).where(Property.id == expense_in.property_id, Property.organization_id == org_id)).scalar_one_or_none()
+    if prop is None:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if expense_in.amount <= 0:
+        raise HTTPException(status_code=422, detail="Expense amount must be positive")
+    if expense_in.currency != "KES":
+        raise HTTPException(status_code=422, detail="Expenses must be recorded in KES")
+    if expense_in.reservation_id:
+        reservation = db.execute(select(Reservation).where(
+            Reservation.id == expense_in.reservation_id,
+            Reservation.organization_id == org_id,
+            Reservation.property_id == expense_in.property_id,
+        )).scalar_one_or_none()
+        if reservation is None:
+            raise HTTPException(status_code=404, detail="Reservation not found for this property")
     expense = Expense(
         organization_id=org_id,
         property_id=expense_in.property_id,
         reservation_id=expense_in.reservation_id,
         title=expense_in.title,
-        category=expense_in.category,
+        category=expense_in.category.strip().lower(),
         amount=expense_in.amount,
         currency=expense_in.currency or "KES",
         expense_date=expense_in.expense_date or date.today(),
@@ -79,9 +94,17 @@ def update_expense(
     if not expense:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Expense not found")
 
-    if expense_in.property_id is not None: expense.property_id = expense_in.property_id
+    if expense_in.property_id is not None:
+        prop = db.execute(select(Property).where(Property.id == expense_in.property_id, Property.organization_id == org_id)).scalar_one_or_none()
+        if prop is None:
+            raise HTTPException(status_code=404, detail="Property not found")
+        if expense.reservation_id and expense.property_id != expense_in.property_id:
+            raise HTTPException(status_code=422, detail="An expense linked to a reservation cannot move to another property")
+        expense.property_id = expense_in.property_id
+    if expense_in.amount is not None and expense_in.amount <= 0:
+        raise HTTPException(status_code=422, detail="Expense amount must be positive")
     if expense_in.title is not None: expense.title = expense_in.title
-    if expense_in.category is not None: expense.category = expense_in.category
+    if expense_in.category is not None: expense.category = expense_in.category.strip().lower()
     if expense_in.amount is not None: expense.amount = expense_in.amount
     if expense_in.expense_date is not None: expense.expense_date = expense_in.expense_date
     if expense_in.vendor_name is not None: expense.vendor_name = expense_in.vendor_name
@@ -180,7 +203,7 @@ def export_expenses_csv(
     if property_id:
         query = query.where(Expense.property_id == property_id)
     if category:
-        query = query.where(Expense.category == category)
+        query = query.where(func.lower(Expense.category) == category.lower())
     query = query.order_by(Expense.expense_date.desc())
 
     records = db.execute(query).all()
@@ -195,7 +218,7 @@ def export_expenses_csv(
     for row in records:
         exp = row[0]
         prop_name = row[1] or "General"
-        writer.writerow([
+        values = [
             exp.id,
             str(exp.expense_date),
             prop_name,
@@ -206,6 +229,10 @@ def export_expenses_csv(
             exp.receipt_reference or "",
             exp.payment_method or "",
             exp.notes or ""
+        ]
+        writer.writerow([
+            "'" + value if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")) else value
+            for value in values
         ])
 
     csv_data = output.getvalue()

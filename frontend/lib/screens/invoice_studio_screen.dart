@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../theme/ginata_theme.dart';
 import '../services/api_service.dart';
+import '../widgets/pdf_viewer.dart';
 
 class InvoiceStudioScreen extends StatefulWidget {
   final String? initialReservationId;
@@ -69,41 +70,31 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
 
     try {
       final doc = await ApiService.exportInvoice(_selectedInvoice!['id'], format);
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: Text('${format.toUpperCase()} Document Generated'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('File: ${doc['file_name']}'),
-                const SizedBox(height: 6),
-                Text('Size: ${(doc['file_size'] / 1024).toStringAsFixed(1)} KB'),
-                const SizedBox(height: 12),
-                const Text('Public Secure Download Link:'),
-                const SizedBox(height: 4),
-                SelectableText(
-                  '${ApiService.baseUrl}/public/documents/${doc['secure_token']}/download',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: GinataColors.primary),
-                ),
-                const SizedBox(height: 8),
-                const Text('Link expires in 14 days and avoids exposing internal database IDs.', style: TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-            ],
-          ),
-        );
+      final token = doc['secure_token']?.toString();
+      final fileName = (doc['file_name'] ?? 'invoice.$format').toString();
+      final apiPath = token != null && token.isNotEmpty
+          ? '/public/documents/$token/download'
+          : '/documents/${doc['id']}/download';
+      if (!mounted) return;
+      setState(() => _isExporting = false);
+      if (format == 'pdf') {
+        await openPdfViewer(context, title: 'Invoice', fileName: fileName, apiPath: apiPath);
+      } else {
+        final bytes = await ApiService.downloadBytes(apiPath);
+        if (mounted) {
+          await saveDocumentToDevice(
+            context,
+            bytes: bytes,
+            fileName: fileName,
+            mimeType: format == 'csv' ? 'text/csv' : 'application/octet-stream',
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e')));
+        setState(() => _isExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: GinataColors.alertTerracotta));
       }
-    } finally {
-      if (mounted) setState(() => _isExporting = false);
     }
   }
 
@@ -113,41 +104,19 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
 
     try {
       final doc = await ApiService.exportReceipt(_selectedReceipt!['id'].toString());
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('PDF Receipt Generated'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('File: ${doc['file_name']}'),
-                const SizedBox(height: 6),
-                Text('Size: ${(doc['file_size'] / 1024).toStringAsFixed(1)} KB'),
-                const SizedBox(height: 12),
-                const Text('Public Secure Download Link:'),
-                const SizedBox(height: 4),
-                SelectableText(
-                  '${ApiService.baseUrl}/public/documents/${doc['secure_token']}/download',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: GinataColors.primary),
-                ),
-                const SizedBox(height: 8),
-                const Text('Link expires in 14 days and guarantees official authenticity.', style: TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
-              ],
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-            ],
-          ),
-        );
-      }
+      final token = doc['secure_token']?.toString();
+      final fileName = (doc['file_name'] ?? 'receipt.pdf').toString();
+      final apiPath = token != null && token.isNotEmpty
+          ? '/public/documents/$token/download'
+          : '/documents/${doc['id']}/download';
+      if (!mounted) return;
+      setState(() => _isExporting = false);
+      await openPdfViewer(context, title: 'Receipt', fileName: fileName, apiPath: apiPath);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e')));
+        setState(() => _isExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Export error: $e'), backgroundColor: GinataColors.alertTerracotta));
       }
-    } finally {
-      if (mounted) setState(() => _isExporting = false);
     }
   }
 
@@ -265,7 +234,7 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
                                   initialValue: docType,
                                   decoration: const InputDecoration(labelText: 'Document Type'),
                                   items: const [
-                                    DropdownMenuItem(value: 'invoice', child: Text('Direct Stay Invoice')),
+                                    DropdownMenuItem(value: 'invoice', child: Text('Invoice')),
                                     DropdownMenuItem(value: 'pro_forma', child: Text('Pro Forma Invoice')),
                                     DropdownMenuItem(value: 'quotation', child: Text('Price Quotation')),
                                   ],
@@ -833,7 +802,7 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
                   initialValue: docType,
                   decoration: const InputDecoration(labelText: 'Document Type'),
                   items: const [
-                    DropdownMenuItem(value: 'invoice', child: Text('Direct Stay Invoice')),
+                    DropdownMenuItem(value: 'invoice', child: Text('Invoice')),
                     DropdownMenuItem(value: 'pro_forma', child: Text('Pro Forma Invoice')),
                     DropdownMenuItem(value: 'quotation', child: Text('Price Quotation')),
                   ],
@@ -983,7 +952,11 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Invoices & Receipts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text('Invoices & Receipts', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: GinataColors.primary),
@@ -1298,30 +1271,37 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
 
           // Interactive Live Preview Card (Clean - NO KRA PIN)
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Center(
-                  child: Container(
-                    width: 620,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: GinataColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0F0D2620),
-                          blurRadius: 24,
-                          offset: Offset(0, 6),
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final viewport = constraints.maxWidth.isFinite ? constraints.maxWidth : 660.0;
+                final previewWidth = viewport >= 680 ? 620.0 : (viewport - 8).clamp(280.0, 620.0);
+                final pad = viewport >= 680 ? 32.0 : 18.0;
+                return SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Center(
+                      child: Container(
+                        width: previewWidth,
+                        padding: EdgeInsets.all(pad),
+                        decoration: BoxDecoration(
+                          color: GinataColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x0F0D2620),
+                              blurRadius: 24,
+                              offset: Offset(0, 6),
+                            ),
+                          ],
+                          border: Border.all(color: const Color(0x14174A3F)),
                         ),
-                      ],
-                      border: Border.all(color: const Color(0x14174A3F)),
+                        child: _buildLiveInvoicePreviewContent(_selectedInvoice!),
+                      ),
                     ),
-                    child: _buildLiveInvoicePreviewContent(_selectedInvoice!),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
         ],
@@ -1382,27 +1362,32 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
 
           // Live Official Receipt Card
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Center(
-                  child: Container(
-                    width: 580,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: GinataColors.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0F0D2620),
-                          blurRadius: 24,
-                          offset: Offset(0, 6),
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final viewport = constraints.maxWidth.isFinite ? constraints.maxWidth : 620.0;
+                final previewWidth = viewport >= 640 ? 580.0 : (viewport - 8).clamp(280.0, 580.0);
+                final pad = viewport >= 640 ? 32.0 : 18.0;
+                return SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Center(
+                      child: Container(
+                        width: previewWidth,
+                        padding: EdgeInsets.all(pad),
+                        decoration: BoxDecoration(
+                          color: GinataColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x0F0D2620),
+                              blurRadius: 24,
+                              offset: Offset(0, 6),
+                            ),
+                          ],
+                          border: Border.all(color: const Color(0x14174A3F)),
                         ),
-                      ],
-                      border: Border.all(color: const Color(0x14174A3F)),
-                    ),
-                    child: Column(
+                        child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Header with Logo
@@ -1503,8 +1488,10 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
+        ),
+      ),
         ],
       ),
     );
@@ -1512,7 +1499,7 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
 
   Widget _buildLiveInvoicePreviewContent(Map<String, dynamic> inv) {
     final docType = (inv['document_type'] ?? 'invoice').toString();
-    final docTitle = docType == 'pro_forma' ? 'PRO FORMA INVOICE' : docType == 'quotation' ? 'PRICE QUOTATION' : 'DIRECT STAY INVOICE';
+    final docTitle = docType == 'pro_forma' ? 'PRO FORMA INVOICE' : docType == 'quotation' ? 'PRICE QUOTATION' : 'INVOICE';
     final lineItems = (inv['line_items'] as List<dynamic>?) ?? [];
 
     return Column(

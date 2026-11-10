@@ -8,12 +8,28 @@ from sqlalchemy import select
 
 from backend.app.core.config import settings
 from backend.app.models.models import (
-    Invoice, Receipt, GeneratedDocument, DocumentDeliveryAttempt, Reservation
+    Invoice, Receipt, GeneratedDocument, DocumentDeliveryAttempt, Reservation, DocumentTemplate
 )
 from backend.app.services.document_generator import (
     generate_invoice_pdf, generate_receipt_pdf, generate_invoice_docx, generate_invoice_csv
 )
 from backend.app.services.audit_service import log_audit_event
+
+
+def get_default_template(db: Session, organization_id: str) -> Optional[DocumentTemplate]:
+    """Returns the organization's default document template, or any template, or None."""
+    tpl = db.execute(
+        select(DocumentTemplate).where(
+            DocumentTemplate.organization_id == organization_id,
+            DocumentTemplate.is_default == True
+        )
+    ).scalars().first()
+    if tpl is None:
+        tpl = db.execute(
+            select(DocumentTemplate).where(DocumentTemplate.organization_id == organization_id)
+        ).scalars().first()
+    return tpl
+
 
 def create_or_get_generated_document(
     db: Session,
@@ -37,6 +53,7 @@ def create_or_get_generated_document(
     doc_type = "invoice"
     raw_bytes = None
     file_name = ""
+    template = get_default_template(db, organization_id)
 
     if invoice_id:
         invoice = db.execute(
@@ -53,15 +70,15 @@ def create_or_get_generated_document(
 
         if format_lower == "pdf":
             file_name = f"{base_slug}.pdf"
-            out_file = settings.DOCUMENTS_DIR / file_name
-            raw_bytes = generate_invoice_pdf(invoice, output_path=str(out_file))
+            out_file = settings.DOCUMENTS_DIR / f"{organization_id}_{secrets.token_hex(16)}_{file_name}"
+            raw_bytes = generate_invoice_pdf(invoice, output_path=str(out_file), template=template)
         elif format_lower == "docx":
             file_name = f"{base_slug}.docx"
-            out_file = settings.DOCUMENTS_DIR / file_name
+            out_file = settings.DOCUMENTS_DIR / f"{organization_id}_{secrets.token_hex(16)}_{file_name}"
             raw_bytes = generate_invoice_docx(invoice, output_path=str(out_file))
         elif format_lower == "csv":
             file_name = f"{base_slug}.csv"
-            out_file = settings.DOCUMENTS_DIR / file_name
+            out_file = settings.DOCUMENTS_DIR / f"{organization_id}_{secrets.token_hex(16)}_{file_name}"
             csv_str = generate_invoice_csv(invoice)
             raw_bytes = csv_str.encode("utf-8")
             with open(out_file, "wb") as f:
@@ -80,8 +97,8 @@ def create_or_get_generated_document(
         doc_type = "receipt"
         base_slug = receipt.receipt_number.replace("/", "-")
         file_name = f"{base_slug}.pdf"
-        out_file = settings.DOCUMENTS_DIR / file_name
-        raw_bytes = generate_receipt_pdf(receipt, output_path=str(out_file))
+        out_file = settings.DOCUMENTS_DIR / f"{organization_id}_{secrets.token_hex(16)}_{file_name}"
+        raw_bytes = generate_receipt_pdf(receipt, output_path=str(out_file), template=template)
 
     # Concurrency-safe secure token
     secure_token = secrets.token_urlsafe(32)
@@ -106,6 +123,43 @@ def create_or_get_generated_document(
     db.commit()
     db.refresh(gen_doc)
     return gen_doc
+
+
+def regenerate_documents_with_template(
+    db: Session,
+    organization_id: str,
+    template: DocumentTemplate
+) -> int:
+    docs = db.execute(
+        select(GeneratedDocument).where(
+            GeneratedDocument.organization_id == organization_id,
+            GeneratedDocument.file_format == "pdf"
+        )
+    ).scalars().all()
+
+    rendered = []
+    for doc in docs:
+        if doc.invoice_id:
+            invoice = db.execute(
+                select(Invoice).where(Invoice.id == doc.invoice_id, Invoice.organization_id == organization_id)
+            ).scalar_one_or_none()
+            if invoice:
+                rendered.append((doc, generate_invoice_pdf(invoice, template=template)))
+        elif doc.receipt_id:
+            receipt = db.execute(
+                select(Receipt).where(Receipt.id == doc.receipt_id, Receipt.organization_id == organization_id)
+            ).scalar_one_or_none()
+            if receipt:
+                rendered.append((doc, generate_receipt_pdf(receipt, template=template)))
+
+    # Render every PDF before replacing archive pointers, preserving old files if rendering fails.
+    for doc, raw_bytes in rendered:
+        out_file = settings.DOCUMENTS_DIR / f"{organization_id}_{secrets.token_hex(16)}.pdf"
+        out_file.write_bytes(raw_bytes)
+        doc.file_path = str(out_file)
+        doc.file_size = len(raw_bytes)
+        doc.version = (doc.version or 1) + 1
+    return len(rendered)
 
 
 def send_document(

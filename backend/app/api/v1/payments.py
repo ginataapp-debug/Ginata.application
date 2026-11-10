@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from backend.app.core.database import get_db
-from backend.app.api.deps import get_current_org_id
-from backend.app.models.models import Payment, Receipt, GeneratedDocument
+from backend.app.api.deps import get_current_org_id, get_current_host
+from backend.app.models.models import Payment, Receipt, GeneratedDocument, HostUser
 from backend.app.schemas.schemas import (
     PaymentResponse, PaymentCreate, ReceiptResponse, ReceiptUpdate, GeneratedDocumentResponse, DocumentExportRequest
 )
@@ -30,13 +30,14 @@ def list_payments(
 def record_payment(
     payment_in: PaymentCreate,
     db: Session = Depends(get_db),
-    org_id: str = Depends(get_current_org_id)
+    org_id: str = Depends(get_current_org_id),
+    host: HostUser = Depends(get_current_host)
 ):
     return record_payment_and_issue_receipt(
         db=db,
         organization_id=org_id,
         payment_in=payment_in,
-        actor_name="Host"
+        actor_name=host.full_name
     )
 
 @router.get("/receipts", response_model=List[ReceiptResponse])
@@ -72,14 +73,15 @@ def update_receipt_endpoint(
     receipt_id: str,
     update_in: ReceiptUpdate,
     db: Session = Depends(get_db),
-    org_id: str = Depends(get_current_org_id)
+    org_id: str = Depends(get_current_org_id),
+    host: HostUser = Depends(get_current_host)
 ):
     return update_receipt(
         db=db,
         organization_id=org_id,
         receipt_id=receipt_id,
         update_in=update_in,
-        actor_name="Host"
+        actor_name=host.full_name
     )
 
 @router.post("/receipts/{receipt_id}/export", response_model=GeneratedDocumentResponse)

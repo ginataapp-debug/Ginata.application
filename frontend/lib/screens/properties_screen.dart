@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import '../theme/ginata_theme.dart';
 import '../services/api_service.dart';
 import 'manual_booking_dialog.dart';
@@ -111,7 +112,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
 
                       // Cover Image Live Preview Section
                       Container(
-                        height: 140,
+                        height: 150,
                         width: double.infinity,
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
@@ -121,89 +122,112 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                         child: previewUrl.isNotEmpty
                             ? ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  previewUrl,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => const Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.broken_image_outlined, color: Colors.grey, size: 36),
-                                        SizedBox(height: 4),
-                                        Text('Image URL not reachable. Paste a valid link.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                      ],
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.network(
+                                      previewUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, _, _) => const Center(
+                                        child: Icon(Icons.broken_image_outlined, color: Colors.grey, size: 36),
+                                      ),
                                     ),
-                                  ),
+                                    Positioned(
+                                      bottom: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.65),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.check_circle, size: 14, color: Colors.white),
+                                            SizedBox(width: 4),
+                                            Text('Cover Photo Active', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               )
                             : const Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.add_photo_alternate_outlined, color: Colors.grey, size: 36),
-                                    SizedBox(height: 4),
-                                    Text('Enter Cover Image URL below to preview', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                    Icon(Icons.add_photo_alternate_outlined, color: GinataColors.secondary, size: 36),
+                                    SizedBox(height: 6),
+                                    Text('No cover photo chosen yet', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GinataColors.textPrimary)),
+                                    SizedBox(height: 2),
+                                    Text('Click Choose File below to upload image', style: TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
                                   ],
                                 ),
                               ),
                       ),
                       const SizedBox(height: 10),
 
-                      // Image URL input & Choose File button
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: imageUrlCtrl,
-                              onChanged: (val) {
-                                setDialogState(() => previewUrl = val.trim());
-                              },
-                              decoration: const InputDecoration(
-                                labelText: 'Cover Image URL *',
-                                hintText: 'Paste link or click Choose File',
-                                prefixIcon: Icon(Icons.link, size: 18),
-                              ),
-                            ),
+                      // Choose File button full width
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: GinataColors.primaryContainer,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: GinataColors.primaryContainer,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            icon: isUploadingImage
-                                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Icon(Icons.upload_file, size: 16),
-                            label: Text(isUploadingImage ? 'Uploading...' : 'Choose File', style: const TextStyle(fontSize: 12)),
-                            onPressed: isUploadingImage
-                                ? null
-                                : () async {
-                                    try {
-                                      final picked = await FilePicker.pickFile(
-                                        type: FileType.image,
-                                      );
-                                      if (picked != null) {
-                                        setDialogState(() => isUploadingImage = true);
-                                        final bytes = await picked.readAsBytes();
-                                        final uploadedUrl = await ApiService.uploadImage(bytes, picked.name);
-                                        imageUrlCtrl.text = uploadedUrl;
-                                        setDialogState(() {
-                                          previewUrl = uploadedUrl;
-                                          isUploadingImage = false;
-                                        });
+                          icon: isUploadingImage
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Icon(Icons.upload_file, size: 18),
+                          label: Text(
+                            isUploadingImage ? 'Uploading Image...' : (previewUrl.isNotEmpty ? 'Change Cover Photo' : 'Choose Cover Photo (from device)'),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                          onPressed: isUploadingImage
+                              ? null
+                              : () async {
+                                  try {
+                                    final picked = await FilePicker.pickFile(
+                                      type: FileType.image,
+                                    );
+                                    if (picked != null) {
+                                      setDialogState(() => isUploadingImage = true);
+                                      final bytes = await picked.readAsBytes();
+                                      final uploadedUrl = await ApiService.uploadImage(bytes, picked.name);
+                                      imageUrlCtrl.text = uploadedUrl;
+                                      // Persist the cover immediately when editing an existing property
+                                      // so the photo is saved and shown without needing "Save Changes".
+                                      if (isEditing) {
+                                        await ApiService.updateProperty(
+                                          property['id'].toString(),
+                                          {'image_url': uploadedUrl},
+                                        );
                                       }
-                                    } catch (e) {
                                       setDialogState(() {
+                                        previewUrl = uploadedUrl;
                                         isUploadingImage = false;
-                                        errorText = 'Upload failed: $e';
                                       });
+                                      if (ctx.mounted) {
+                                        ScaffoldMessenger.of(ctx).showSnackBar(
+                                          SnackBar(
+                                            content: Text(isEditing ? 'Cover photo saved & applied!' : 'Cover photo ready — it will be saved with the property.'),
+                                            backgroundColor: GinataColors.successSage,
+                                            duration: const Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
                                     }
-                                  },
-                          ),
-                        ],
+                                  } catch (e) {
+                                    setDialogState(() {
+                                      isUploadingImage = false;
+                                      errorText = 'Upload failed: $e';
+                                    });
+                                  }
+                                },
+                        ),
                       ),
                       const SizedBox(height: 14),
 
@@ -452,12 +476,184 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     }
   }
 
+  // ==========================================
+  // HOST TOOLS — 6 extra actions per property
+  // ==========================================
+
+  Future<void> _duplicateProperty(dynamic property) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Duplicate Property?', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+        content: Text('Create a copy of "${property['name']}" with the same rates, fees, cover photo and calendar feeds. Bookings and inventory are not copied.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: GinataColors.primary, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Duplicate'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      final baseName = '${property['name'] ?? 'Property'} (Copy)';
+      final payload = {
+        'name': baseName,
+        'slug': '${baseName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-')}-${DateTime.now().millisecondsSinceEpoch}',
+        'address': property['address']?.toString() ?? '',
+        'city': property['city']?.toString() ?? 'Nairobi',
+        'country': property['country']?.toString() ?? 'Kenya',
+        'default_nightly_rate': double.tryParse(property['default_nightly_rate']?.toString() ?? '0') ?? 0,
+        'currency': property['currency']?.toString() ?? 'KES',
+        'cleaning_fee': double.tryParse(property['cleaning_fee']?.toString() ?? '0') ?? 0,
+        'tax_rate': 0.0,
+        'image_url': property['image_url']?.toString(),
+        'airbnb_ical_url': property['airbnb_ical_url']?.toString(),
+        'booking_com_ical_url': property['booking_com_ical_url']?.toString(),
+      };
+      await ApiService.createProperty(payload);
+      await _loadProperties();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"$baseName" created and ready to edit.'), backgroundColor: GinataColors.successSage),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not duplicate: $e'), backgroundColor: GinataColors.alertTerracotta),
+        );
+      }
+    }
+  }
+
+  void _openAvailabilityDialog(dynamic property) {
+    showDialog(context: context, builder: (_) => _PropertyAvailabilityDialog(property: property));
+  }
+
+  void _openPerformanceDialog(dynamic property) {
+    showDialog(context: context, builder: (_) => _PropertyPerformanceDialog(property: property));
+  }
+
+  void _openPropertyExpensesDialog(dynamic property) {
+    showDialog(context: context, builder: (_) => _PropertyExpensesDialog(property: property));
+  }
+
+  void _shareListing(dynamic property) {
+    final feedUrl = '${ApiService.baseUrl}/properties/${property['id']}/feed.ics';
+    final rate = GinataFormatters.formatKES(property['default_nightly_rate']);
+    final cleaning = GinataFormatters.formatKES(property['cleaning_fee']);
+    final location = [property['address'], property['city'], property['country']]
+        .where((e) => e != null && e.toString().trim().isNotEmpty)
+        .map((e) => e.toString())
+        .join(', ');
+    final blurb = StringBuffer()
+      ..writeln('🏡 ${property['name'] ?? 'Property'}')
+      ..writeln(location.isEmpty ? 'Kenya' : location)
+      ..writeln('')
+      ..writeln('Nightly rate: $rate (0% VAT — direct booking)')
+      ..writeln('Cleaning fee: $cleaning')
+      ..writeln('')
+      ..writeln('Book direct with the host for the best rate.')
+      ..writeln('Live availability calendar: $feedUrl');
+    Clipboard.setData(ClipboardData(text: blurb.toString()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Listing details & availability link copied — paste into WhatsApp, Airbnb or email.'),
+        backgroundColor: GinataColors.primary,
+      ),
+    );
+  }
+
+  Future<void> _exportPropertyReport(dynamic property) async {
+    final propId = property['id'].toString();
+    try {
+      final summary = await ApiService.fetchFinancialSummary(propertyId: propId);
+      final inventory = await ApiService.fetchPropertyInventory(propId);
+      final reservations = await ApiService.fetchReservations(propertyId: propId);
+      final active = reservations.where((r) => r['reservation_status'] != 'cancelled').length;
+      final fmt = DateFormat('dd MMM yyyy, HH:mm');
+      final report = StringBuffer()
+        ..writeln('═══════════════════════════════════')
+        ..writeln('  GINATA PROPERTY REPORT')
+        ..writeln('  ${property['name'] ?? 'Property'}')
+        ..writeln('  Generated ${fmt.format(DateTime.now())}')
+        ..writeln('═══════════════════════════════════')
+        ..writeln('')
+        ..writeln('LOCATION')
+        ..writeln('  ${property['address'] ?? ''}, ${property['city'] ?? ''}, ${property['country'] ?? 'Kenya'}')
+        ..writeln('')
+        ..writeln('RATES')
+        ..writeln('  Nightly: ${GinataFormatters.formatKES(property['default_nightly_rate'])}')
+        ..writeln('  Cleaning: ${GinataFormatters.formatKES(property['cleaning_fee'])}')
+        ..writeln('  VAT: 0.00% (Direct)')
+        ..writeln('')
+        ..writeln('CHANNEL SYNC')
+        ..writeln('  Airbnb: ${(property['airbnb_ical_url']?.toString().isNotEmpty ?? false) ? "Connected" : "Not set"}')
+        ..writeln('  Booking.com: ${(property['booking_com_ical_url']?.toString().isNotEmpty ?? false) ? "Connected" : "Not set"}')
+        ..writeln('')
+        ..writeln('PERFORMANCE')
+        ..writeln('  Active reservations: $active')
+        ..writeln('  Inventory items tracked: ${inventory.length}')
+        ..writeln('  Gross revenue: ${GinataFormatters.formatKES(summary['gross_revenue'])}')
+        ..writeln('  Collected: ${GinataFormatters.formatKES(summary['collected_revenue'])}')
+        ..writeln('  Pending balance: ${GinataFormatters.formatKES(summary['pending_balance'])}')
+        ..writeln('  Expenses: ${GinataFormatters.formatKES(summary['total_expenses'])}')
+        ..writeln('  Net operating profit: ${GinataFormatters.formatKES(summary['net_operating_profit'])}')
+        ..writeln('')
+        ..writeln('Availability feed: ${ApiService.baseUrl}/properties/$propId/feed.ics');
+      await Clipboard.setData(ClipboardData(text: report.toString()));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Full property report copied to clipboard.'), backgroundColor: GinataColors.primary),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not build report: $e'), backgroundColor: GinataColors.alertTerracotta),
+        );
+      }
+    }
+  }
+
+  Widget _hostToolChip(IconData icon, String label, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(9),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: color.withValues(alpha: 0.28)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 5),
+            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: GinataColors.background,
       appBar: AppBar(
-        title: const Text('Property Portfolio & Inventory', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text('Properties & Inventory', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
@@ -476,7 +672,7 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Property', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+              label: Text(MediaQuery.sizeOf(context).width < 480 ? 'Add' : 'Add Property', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
               onPressed: () => _openPropertyDialog(),
             ),
           ),
@@ -787,6 +983,32 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                                               tooltip: 'Delete Property',
                                               onPressed: () => _confirmDelete(prop),
                                             ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 14),
+                                        const Divider(height: 1),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.auto_awesome, size: 13, color: GinataColors.brassGold),
+                                            const SizedBox(width: 6),
+                                            const Text(
+                                              'HOST TOOLS',
+                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: GinataColors.textSecondary),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            _hostToolChip(Icons.copy_all, 'Duplicate', GinataColors.primary, () => _duplicateProperty(prop)),
+                                            _hostToolChip(Icons.event_available, 'Availability', const Color(0xFF1D4ED8), () => _openAvailabilityDialog(prop)),
+                                            _hostToolChip(Icons.insights, 'Performance', GinataColors.successSage, () => _openPerformanceDialog(prop)),
+                                            _hostToolChip(Icons.receipt_long, 'Expenses', GinataColors.warningOchre, () => _openPropertyExpensesDialog(prop)),
+                                            _hostToolChip(Icons.ios_share, 'Share Listing', const Color(0xFFBE185D), () => _shareListing(prop)),
+                                            _hostToolChip(Icons.summarize, 'Export Report', GinataColors.secondary, () => _exportPropertyReport(prop)),
                                           ],
                                         ),
                                       ],
@@ -1390,6 +1612,716 @@ class _PropertySyncDialogState extends State<_PropertySyncDialog> {
                         : const Text('Save Feeds'),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// HOST TOOL 1 — AVAILABILITY / UPCOMING STAYS
+// ==========================================
+class _PropertyAvailabilityDialog extends StatefulWidget {
+  final dynamic property;
+  const _PropertyAvailabilityDialog({required this.property});
+
+  @override
+  State<_PropertyAvailabilityDialog> createState() => _PropertyAvailabilityDialogState();
+}
+
+class _PropertyAvailabilityDialogState extends State<_PropertyAvailabilityDialog> {
+  bool _loading = true;
+  List<dynamic> _stays = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final res = await ApiService.fetchReservations(propertyId: widget.property['id'].toString());
+      final stays = res.where((r) => r['reservation_status'] != 'cancelled').toList();
+      stays.sort((a, b) {
+        final da = DateTime.tryParse(a['check_in_date']?.toString() ?? '') ?? DateTime(2100);
+        final db = DateTime.tryParse(b['check_in_date']?.toString() ?? '') ?? DateTime(2100);
+        return da.compareTo(db);
+      });
+      if (mounted) setState(() { _stays = stays; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  DateTime? _parse(dynamic v) => DateTime.tryParse(v?.toString() ?? '');
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final upcoming = _stays.where((s) {
+      final out = _parse(s['check_out_date']);
+      return out != null && !out.isBefore(today);
+    }).toList();
+    final nextIn = upcoming.isNotEmpty ? _parse(upcoming.first['check_in_date']) : null;
+    final df = DateFormat('EEE, dd MMM yyyy');
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 560, maxHeight: MediaQuery.of(context).size.height * 0.85),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(color: const Color(0xFF1D4ED8).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.event_available, color: Color(0xFF1D4ED8), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Availability & Stays', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(widget.property['name']?.toString() ?? 'Property', style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary), overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF1D4ED8), Color(0xFF3B82F6)]),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${upcoming.length}', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white)),
+                          const Text('Upcoming / active stays', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                        ],
+                      ),
+                    ),
+                    if (nextIn != null)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('NEXT CHECK-IN', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1, color: Colors.white70)),
+                          const SizedBox(height: 3),
+                          Text(df.format(nextIn), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator(color: GinataColors.primary))
+                    : _stays.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.event_busy, size: 44, color: Colors.grey.shade400),
+                                const SizedBox(height: 10),
+                                const Text('No stays booked yet', style: TextStyle(fontWeight: FontWeight.bold, color: GinataColors.textPrimary)),
+                                const SizedBox(height: 4),
+                                const Text('This property is fully available. Create a booking to fill the calendar.', style: TextStyle(fontSize: 12, color: GinataColors.textSecondary), textAlign: TextAlign.center),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: _stays.length,
+                            separatorBuilder: (_, _) => const SizedBox(height: 10),
+                            itemBuilder: (_, i) {
+                              final s = _stays[i];
+                              final inD = _parse(s['check_in_date']);
+                              final outD = _parse(s['check_out_date']);
+                              final nights = (inD != null && outD != null) ? outD.difference(inD).inDays : 0;
+                              final guest = s['primary_guest'];
+                              final guestName = guest is Map ? '${guest['first_name'] ?? ''} ${guest['last_name'] ?? ''}'.trim() : 'Guest';
+                              final status = (s['reservation_status'] ?? 'confirmed').toString();
+                              final isPast = outD != null && outD.isBefore(today);
+                              final statusColor = isPast
+                                  ? GinataColors.textMuted
+                                  : status == 'checked_in'
+                                      ? GinataColors.successSage
+                                      : const Color(0xFF1D4ED8);
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: GinataColors.outlineVariant.withValues(alpha: 0.5)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 4,
+                                      height: 44,
+                                      decoration: BoxDecoration(color: statusColor, borderRadius: BorderRadius.circular(4)),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(guestName.isEmpty ? 'Guest' : guestName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            '${inD != null ? df.format(inD) : '?'}  →  ${outD != null ? df.format(outD) : '?'}',
+                                            style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                                          child: Text(isPast ? 'completed' : status.replaceAll('_', ' '), style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: statusColor)),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text('$nights ${nights == 1 ? "night" : "nights"}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: GinataColors.textSecondary)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// HOST TOOL 2 — PERFORMANCE & REVENUE
+// ==========================================
+class _PropertyPerformanceDialog extends StatefulWidget {
+  final dynamic property;
+  const _PropertyPerformanceDialog({required this.property});
+
+  @override
+  State<_PropertyPerformanceDialog> createState() => _PropertyPerformanceDialogState();
+}
+
+class _PropertyPerformanceDialogState extends State<_PropertyPerformanceDialog> {
+  bool _loading = true;
+  Map<String, dynamic> _summary = {};
+  int _bookings = 0;
+  int _activeBookings = 0;
+  int _totalNights = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final propId = widget.property['id'].toString();
+    try {
+      final results = await Future.wait([
+        ApiService.fetchFinancialSummary(propertyId: propId),
+        ApiService.fetchReservations(propertyId: propId),
+      ]);
+      final summary = results[0] as Map<String, dynamic>;
+      final reservations = results[1] as List<dynamic>;
+      int active = 0, nights = 0;
+      for (final r in reservations) {
+        if (r['reservation_status'] == 'cancelled') continue;
+        active++;
+        final inD = DateTime.tryParse(r['check_in_date']?.toString() ?? '');
+        final outD = DateTime.tryParse(r['check_out_date']?.toString() ?? '');
+        if (inD != null && outD != null) nights += outD.difference(inD).inDays;
+      }
+      if (mounted) {
+        setState(() {
+          _summary = summary;
+          _bookings = reservations.length;
+          _activeBookings = active;
+          _totalNights = nights < 0 ? 0 : nights;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  double _num(String key) => double.tryParse(_summary[key]?.toString() ?? '0') ?? 0.0;
+
+  Widget _metric(String label, String value, IconData icon, Color color, {String? sub}) {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: color),
+              const SizedBox(width: 6),
+              Expanded(child: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: GinataColors.textSecondary), overflow: TextOverflow.ellipsis)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color))),
+          if (sub != null) ...[
+            const SizedBox(height: 2),
+            Text(sub, style: const TextStyle(fontSize: 9, color: GinataColors.textMuted)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gross = _num('gross_revenue');
+    final collected = _num('collected_revenue');
+    final pending = _num('pending_balance');
+    final expenses = _num('total_expenses');
+    final commissions = _num('total_agent_commissions');
+    final net = _num('net_operating_profit');
+    final collectionRate = gross > 0 ? (collected / gross).clamp(0.0, 1.0) : 0.0;
+    final avgNightly = _totalNights > 0 ? gross / _totalNights : 0.0;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 600, maxHeight: MediaQuery.of(context).size.height * 0.88),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(color: GinataColors.successSage.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.insights, color: GinataColors.successSage, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Performance & Revenue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(widget.property['name']?.toString() ?? 'Property', style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary), overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  IconButton(icon: const Icon(Icons.refresh, size: 20), onPressed: _load, tooltip: 'Refresh'),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator(color: GinataColors.primary))
+                    : SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(colors: [GinataColors.primary, GinataColors.primaryContainer]),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('NET OPERATING PROFIT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: Colors.white70)),
+                                  const SizedBox(height: 6),
+                                  FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(GinataFormatters.formatKES(net), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white))),
+                                  const SizedBox(height: 4),
+                                  Text('Gross ${GinataFormatters.formatKES(gross)} − expenses ${GinataFormatters.formatKES(expenses)} − commissions ${GinataFormatters.formatKES(commissions)}', style: const TextStyle(fontSize: 10, color: Colors.white70)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            GridView.count(
+                              crossAxisCount: 2,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              childAspectRatio: 1.7,
+                              children: [
+                                _metric('Gross Revenue', GinataFormatters.formatKES(gross), Icons.trending_up, GinataColors.primary),
+                                _metric('Collected', GinataFormatters.formatKES(collected), Icons.payments_outlined, GinataColors.successSage),
+                                _metric('Pending Balance', GinataFormatters.formatKES(pending), Icons.hourglass_bottom, GinataColors.warningOchre),
+                                _metric('Total Expenses', GinataFormatters.formatKES(expenses), Icons.receipt_long, GinataColors.alertTerracotta),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(color: GinataColors.surfaceSubdued, borderRadius: BorderRadius.circular(12)),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text('Collection progress', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GinataColors.textPrimary)),
+                                      Text('${(collectionRate * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: GinataColors.successSage)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: LinearProgressIndicator(value: collectionRate, minHeight: 9, backgroundColor: GinataColors.outlineVariant.withValues(alpha: 0.4), color: GinataColors.successSage),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text('${GinataFormatters.formatKES(collected)} collected of ${GinataFormatters.formatKES(gross)} booked', style: const TextStyle(fontSize: 10, color: GinataColors.textSecondary)),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text('BOOKING ACTIVITY', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: GinataColors.textSecondary)),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(child: _metric('Total Bookings', '$_bookings', Icons.book_online, const Color(0xFF1D4ED8))),
+                                const SizedBox(width: 10),
+                                Expanded(child: _metric('Active', '$_activeBookings', Icons.event_available, GinataColors.successSage)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(child: _metric('Nights Booked', '$_totalNights', Icons.nightlight_round, GinataColors.secondary)),
+                                const SizedBox(width: 10),
+                                Expanded(child: _metric('Avg / Night', GinataFormatters.formatKES(avgNightly), Icons.bedroom_parent, GinataColors.brassGold, sub: 'realized rate')),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==========================================
+// HOST TOOL 3 — PROPERTY EXPENSE LOG
+// ==========================================
+class _PropertyExpensesDialog extends StatefulWidget {
+  final dynamic property;
+  const _PropertyExpensesDialog({required this.property});
+
+  @override
+  State<_PropertyExpensesDialog> createState() => _PropertyExpensesDialogState();
+}
+
+class _PropertyExpensesDialogState extends State<_PropertyExpensesDialog> {
+  bool _loading = true;
+  bool _showForm = false;
+  bool _saving = false;
+  List<dynamic> _expenses = [];
+
+  final _titleCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _vendorCtrl = TextEditingController();
+  String _category = 'maintenance';
+  String _method = 'mpesa';
+
+  static const _categories = {
+    'maintenance': 'Maintenance',
+    'cleaning': 'Cleaning',
+    'utilities': 'Utilities',
+    'supplies': 'Supplies',
+    'repairs': 'Repairs',
+    'marketing': 'Marketing',
+    'other': 'Other',
+  };
+  static const _methods = {'mpesa': 'M-Pesa', 'cash': 'Cash', 'bank': 'Bank Transfer', 'card': 'Card'};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _amountCtrl.dispose();
+    _vendorCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    try {
+      final exp = await ApiService.fetchExpenses(propertyId: widget.property['id'].toString());
+      if (mounted) setState(() { _expenses = exp; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _save() async {
+    final title = _titleCtrl.text.trim();
+    final amount = double.tryParse(_amountCtrl.text.trim());
+    if (title.isEmpty || amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a title and a valid amount.'), backgroundColor: GinataColors.alertTerracotta));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ApiService.createExpense({
+        'property_id': widget.property['id'].toString(),
+        'title': title,
+        'category': _category,
+        'amount': amount,
+        'currency': 'KES',
+        'expense_date': DateTime.now().toIso8601String().substring(0, 10),
+        'vendor_name': _vendorCtrl.text.trim().isEmpty ? null : _vendorCtrl.text.trim(),
+        'payment_method': _method,
+      });
+      _titleCtrl.clear();
+      _amountCtrl.clear();
+      _vendorCtrl.clear();
+      if (mounted) setState(() { _showForm = false; _saving = false; });
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Expense recorded.'), backgroundColor: GinataColors.successSage));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: GinataColors.alertTerracotta));
+      }
+    }
+  }
+
+  Future<void> _delete(String id) async {
+    try {
+      await ApiService.deleteExpense(id);
+      await _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = _expenses.fold<double>(0.0, (sum, e) => sum + (double.tryParse(e['amount']?.toString() ?? '0') ?? 0.0));
+    final df = DateFormat('dd MMM yyyy');
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 580, maxHeight: MediaQuery.of(context).size.height * 0.88),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(color: GinataColors.warningOchre.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.receipt_long, color: GinataColors.warningOchre, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Property Expenses', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text(widget.property['name']?.toString() ?? 'Property', style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary), overflow: TextOverflow.ellipsis),
+                      ],
+                    ),
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(color: GinataColors.warningOchre.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('TOTAL SPENT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1, color: GinataColors.warningOchre)),
+                          const SizedBox(height: 3),
+                          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(GinataFormatters.formatKES(total), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: GinataColors.warningOchre))),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _showForm ? Colors.grey : GinataColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: Icon(_showForm ? Icons.close : Icons.add, size: 16),
+                    label: Text(_showForm ? 'Cancel' : 'Add', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    onPressed: () => setState(() => _showForm = !_showForm),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_showForm) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(color: GinataColors.surfaceSubdued, borderRadius: BorderRadius.circular(12), border: Border.all(color: GinataColors.outlineVariant.withValues(alpha: 0.5))),
+                          child: Column(
+                            children: [
+                              TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Expense title *', hintText: 'e.g. Plumbing repair, cleaning crew')),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(child: TextField(controller: _amountCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Amount (KES) *', prefixText: 'KES '))),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: _category,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(labelText: 'Category'),
+                                      items: _categories.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
+                                      onChanged: (v) => setState(() => _category = v ?? _category),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(child: TextField(controller: _vendorCtrl, decoration: const InputDecoration(labelText: 'Vendor / Payee', hintText: 'Optional'))),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue: _method,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(labelText: 'Paid via'),
+                                      items: _methods.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 12)))).toList(),
+                                      onChanged: (v) => setState(() => _method = v ?? _method),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: GinataColors.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 13)),
+                                  onPressed: _saving ? null : _save,
+                                  child: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Record Expense', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      _loading
+                          ? const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: GinataColors.primary)))
+                          : _expenses.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Column(
+                                      children: [
+                                        Icon(Icons.receipt_long_outlined, size: 42, color: Colors.grey.shade400),
+                                        const SizedBox(height: 8),
+                                        const Text('No expenses logged', style: TextStyle(fontWeight: FontWeight.bold, color: GinataColors.textPrimary)),
+                                        const SizedBox(height: 4),
+                                        const Text('Track maintenance, cleaning and utilities to see true net profit.', style: TextStyle(fontSize: 12, color: GinataColors.textSecondary), textAlign: TextAlign.center),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: _expenses.length,
+                                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                                  itemBuilder: (_, i) {
+                                    final e = _expenses[i];
+                                    final cat = (e['category'] ?? 'other').toString();
+                                    final catLabel = _categories[cat] ?? cat;
+                                    final date = DateTime.tryParse(e['expense_date']?.toString() ?? '');
+                                    return Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: GinataColors.outlineVariant.withValues(alpha: 0.5))),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(e['title']?.toString() ?? 'Expense', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), overflow: TextOverflow.ellipsis),
+                                                const SizedBox(height: 3),
+                                                Text('$catLabel • ${date != null ? df.format(date) : ''}${e['vendor_name'] != null && e['vendor_name'].toString().isNotEmpty ? " • ${e['vendor_name']}" : ""}', style: const TextStyle(fontSize: 10, color: GinataColors.textSecondary), overflow: TextOverflow.ellipsis),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(GinataFormatters.formatKES(e['amount']), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: GinataColors.alertTerracotta)),
+                                          IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: Colors.grey), onPressed: () => _delete(e['id'].toString()), tooltip: 'Remove'),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

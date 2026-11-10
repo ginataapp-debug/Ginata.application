@@ -35,16 +35,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   }
 
   void _showReservationDetails(Map<String, dynamic> res) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: GinataColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => _ReservationDetailsSheet(
-        reservation: res,
-        onRefresh: _loadReservations,
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReservationDetailsPage(
+          reservation: res,
+          onRefresh: _loadReservations,
+        ),
       ),
     );
     _loadReservations();
@@ -169,6 +165,8 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   Widget _buildReservationCard(dynamic res) {
     final guest = res['primary_guest'] ?? {};
     final guestName = '${guest['first_name'] ?? ''} ${guest['last_name'] ?? ''}'.trim();
+    final guestPhone = (guest['phone'] ?? '').toString();
+    final guestEmail = (guest['email'] ?? '').toString();
     final prop = res['property'] ?? {};
     final propName = prop['name'] ?? 'Residence';
     final unit = res['unit'] ?? {};
@@ -179,9 +177,26 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
     final totalKes = GinataFormatters.formatKES(res['total_amount']);
     final balanceKes = GinataFormatters.formatKES(res['balance_due']);
     final hasConflict = res['has_conflict'] == true;
+    final hasAgent = res['has_agent'] == true;
+    final sourceColor = source.contains('AIRBNB')
+        ? const Color(0xFFFF5A5F)
+        : source.contains('BOOKING')
+            ? const Color(0xFF003580)
+            : GinataColors.primary;
+    final formLabel = formStatus == 'completed'
+        ? 'Form Verified'
+        : formStatus == 'needs_review'
+            ? 'Needs Review'
+            : 'Form Pending';
+    final formColor = formStatus == 'completed'
+        ? GinataColors.primary
+        : formStatus == 'needs_review'
+            ? GinataColors.warningOchre
+            : GinataColors.textSecondary;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         onTap: () => _showReservationDetails(res as Map<String, dynamic>),
         borderRadius: BorderRadius.circular(16),
@@ -190,202 +205,218 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Row: Guest & Channel Tag
+              // Top Row: Guest (flexible) + Channel Tag (fixed)
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: GinataColors.primaryContainer,
-                        child: Text(
-                          guestName.isNotEmpty ? guestName[0] : 'G',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(guestName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: GinataColors.primary)),
-                              if (hasConflict) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: GinataColors.errorContainer,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text('OVERRIDDEN CONFLICT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GinataColors.alertTerracotta)),
-                                ),
-                              ],
-                            ],
-                          ),
-                          Text(
-                            unitName.isNotEmpty ? '$propName • $unitName' : propName,
-                            style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ],
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: GinataColors.primaryContainer,
+                    child: Text(
+                      guestName.isNotEmpty ? guestName[0] : 'G',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  Row(
-                    children: [
-                      if (res['has_agent'] == true) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.4)),
-                          ),
-                          child: Text(
-                            'AGENT: ${res['agent_name'] ?? 'Broker'} (${res['agent_commission_percent'] ?? 0}%)',
-                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
-                          ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          guestName.isEmpty ? 'Guest' : guestName,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: GinataColors.primary),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(width: 6),
+                        Text(
+                          unitName.isNotEmpty ? '$propName • $unitName' : propName,
+                          style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: source.contains('AIRBNB')
-                              ? const Color(0xFFFF5A5F).withValues(alpha: 0.12)
-                              : source.contains('BOOKING')
-                                  ? const Color(0xFF003580).withValues(alpha: 0.12)
-                                  : GinataColors.secondaryContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          source,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: source.contains('AIRBNB')
-                                ? const Color(0xFFD93B40)
-                                : source.contains('BOOKING')
-                                    ? const Color(0xFF003580)
-                                    : GinataColors.primary,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: sourceColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      source,
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: sourceColor),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
 
-              // Middle: Dates & Nights
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: GinataColors.surfaceSubdued,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Status badges row (agent / conflict) — wraps instead of overflowing
+              if (hasAgent || hasConflict) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today_outlined, size: 14, color: GinataColors.secondary),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${res['check_in_date']} - ${res['check_out_date']} (${res['number_of_nights']} nts)',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GinataColors.textPrimary),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      '${res['number_of_guests']} Guests',
-                      style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Bottom Row: Financials and Form Status
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        totalKes,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: GinataColors.primary),
-                      ),
-                      if (res['has_agent'] == true && res['agent_commission_amount'] != null)
-                        Text(
-                          'Net Host: ${GinataFormatters.formatKES(res['net_host_amount'])}',
-                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
-                        ),
-                      Text(
-                        payStatus == 'paid' ? 'Paid in full' : 'Due: $balanceKes',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: payStatus == 'paid' ? GinataColors.secondary : GinataColors.warningOchre,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      // Guest Form Status Pill
+                    if (hasAgent)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: formStatus == 'completed'
-                              ? GinataColors.secondaryContainer.withValues(alpha: 0.7)
-                              : formStatus == 'needs_review'
-                                  ? GinataColors.warningContainer
-                                  : GinataColors.surfaceContainerHigh,
+                          color: const Color(0xFF7C3AED).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.4)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              formStatus == 'completed'
-                                  ? Icons.check_circle
-                                  : formStatus == 'needs_review'
-                                      ? Icons.rule
-                                      : Icons.pending,
-                              size: 12,
-                              color: formStatus == 'completed'
-                                  ? GinataColors.primary
-                                  : formStatus == 'needs_review'
-                                      ? GinataColors.warningOchre
-                                      : GinataColors.textSecondary,
-                            ),
+                            const Icon(Icons.support_agent, size: 11, color: Color(0xFF7C3AED)),
                             const SizedBox(width: 4),
-                            Text(
-                              formStatus == 'completed'
-                                  ? 'Form Verified'
-                                  : formStatus == 'needs_review'
-                                      ? 'Needs Review'
-                                      : 'Form Pending',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: formStatus == 'completed'
-                                    ? GinataColors.primary
-                                    : formStatus == 'needs_review'
-                                        ? GinataColors.warningOchre
-                                        : GinataColors.textSecondary,
+                            Flexible(
+                              child: Text(
+                                'Agent: ${res['agent_name'] ?? 'Broker'} • ${res['agent_commission_percent'] ?? 0}%',
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right, size: 20, color: GinataColors.outline),
-                    ],
+                    if (hasConflict)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: GinataColors.errorContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.warning_amber_rounded, size: 11, color: GinataColors.alertTerracotta),
+                            SizedBox(width: 4),
+                            Text('OVERRIDDEN CONFLICT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GinataColors.alertTerracotta)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+
+              // Dates & Nights (date text flexes, guests stay fixed)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: GinataColors.surfaceSubdued,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today_outlined, size: 14, color: GinataColors.secondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${res['check_in_date']} → ${res['check_out_date']}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GinataColors.textPrimary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${res['number_of_nights']} nts',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GinataColors.secondary),
+                    ),
+                    Container(width: 1, height: 14, margin: const EdgeInsets.symmetric(horizontal: 8), color: GinataColors.outlineVariant),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.people_outline, size: 13, color: GinataColors.textSecondary),
+                        const SizedBox(width: 3),
+                        Text('${res['number_of_guests']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: GinataColors.textSecondary)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Guest contact (informative, ellipsized so it never sticks out)
+              if (guestPhone.isNotEmpty || guestEmail.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(guestPhone.isNotEmpty ? Icons.phone_outlined : Icons.email_outlined, size: 13, color: GinataColors.textMuted),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        [guestPhone, guestEmail].where((e) => e.isNotEmpty).join('  •  '),
+                        style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 12),
+
+              // Bottom Row: Financials (flex) + Form pill (flex) + chevron
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(totalKes, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: GinataColors.primary), overflow: TextOverflow.ellipsis),
+                        if (hasAgent && res['net_host_amount'] != null)
+                          Text(
+                            'Net host: ${GinataFormatters.formatKES(res['net_host_amount'])}',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        Text(
+                          payStatus == 'paid' ? 'Paid in full' : 'Due: $balanceKes',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: payStatus == 'paid' ? GinataColors.successSage : GinataColors.warningOchre,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: formStatus == 'completed'
+                            ? GinataColors.secondaryContainer.withValues(alpha: 0.7)
+                            : formStatus == 'needs_review'
+                                ? GinataColors.warningContainer
+                                : GinataColors.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            formStatus == 'completed'
+                                ? Icons.check_circle
+                                : formStatus == 'needs_review'
+                                    ? Icons.rule
+                                    : Icons.pending,
+                            size: 12,
+                            color: formColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(formLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: formColor), overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right, size: 20, color: GinataColors.outline),
                 ],
               ),
             ],
@@ -396,20 +427,21 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   }
 }
 
-class _ReservationDetailsSheet extends StatefulWidget {
+class ReservationDetailsPage extends StatefulWidget {
   final Map<String, dynamic> reservation;
   final VoidCallback onRefresh;
 
-  const _ReservationDetailsSheet({
+  const ReservationDetailsPage({
+    super.key,
     required this.reservation,
     required this.onRefresh,
   });
 
   @override
-  State<_ReservationDetailsSheet> createState() => _ReservationDetailsSheetState();
+  State<ReservationDetailsPage> createState() => _ReservationDetailsPageState();
 }
 
-class _ReservationDetailsSheetState extends State<_ReservationDetailsSheet> {
+class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
   Map<String, dynamic>? _timelineData;
   bool _isLoadingTimeline = true;
 
@@ -429,14 +461,20 @@ class _ReservationDetailsSheetState extends State<_ReservationDetailsSheet> {
   }
 
   void _recordPayment() async {
-    final resId = widget.reservation['id'].toString();
-    final balance = widget.reservation['balance_due']?.toString() ?? '0';
+    final res = widget.reservation;
+    final resId = res['id'].toString();
+    final guest = res['primary_guest'] ?? {};
+    final guestName = '${guest['first_name'] ?? ''} ${guest['last_name'] ?? ''}'.trim();
 
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => PaymentModal(
         reservationId: resId,
-        suggestedAmount: double.tryParse(balance) ?? 0,
+        suggestedAmount: double.tryParse(res['balance_due']?.toString() ?? '0') ?? 0,
+        totalAmount: double.tryParse(res['total_amount']?.toString() ?? '0') ?? 0,
+        amountPaid: double.tryParse(res['amount_paid']?.toString() ?? '0') ?? 0,
+        balanceDue: double.tryParse(res['balance_due']?.toString() ?? '0') ?? 0,
+        guestName: guestName.isEmpty ? null : guestName,
       ),
     );
     if (result == true) {
@@ -536,38 +574,43 @@ class _ReservationDetailsSheetState extends State<_ReservationDetailsSheet> {
     final paidKes = GinataFormatters.formatKES(res['amount_paid']);
     final balanceKes = GinataFormatters.formatKES(res['balance_due']);
 
-    return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Drag handle
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: GinataColors.outlineVariant, borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final initial = guestName.isNotEmpty ? guestName[0].toUpperCase() : 'G';
+    final refLabel = (res['booking_reference'] ?? res['id'].toString().substring(0, 8)).toString();
+    return Scaffold(
+      backgroundColor: GinataColors.background,
+      appBar: AppBar(
+        backgroundColor: GinataColors.primary,
+        foregroundColor: Colors.white,
+        titleSpacing: 0,
+        title: Padding(
+          padding: const EdgeInsets.only(left: 4, right: 8),
+          child: Row(
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(guestName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: GinataColors.primary)),
-                  Text('$propName • Ref: ${res['booking_reference'] ?? res['id'].toString().substring(0, 8)}', style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary)),
-                ],
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white24,
+                child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
               ),
-              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(guestName.isEmpty ? 'Guest' : guestName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
+                    Text('$propName • Ref: $refLabel', style: const TextStyle(fontSize: 11, color: Colors.white70), overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           // Action Shortcuts Ribbon
           Wrap(
             spacing: 8,
@@ -641,11 +684,11 @@ class _ReservationDetailsSheetState extends State<_ReservationDetailsSheet> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildFinMetric('TOTAL BILLED', totalKes),
+                Expanded(child: _buildFinMetric('TOTAL BILLED', totalKes)),
                 Container(width: 1, height: 32, color: GinataColors.outlineVariant),
-                _buildFinMetric('AMOUNT PAID', paidKes, isPositive: true),
+                Expanded(child: _buildFinMetric('AMOUNT PAID', paidKes, isPositive: true)),
                 Container(width: 1, height: 32, color: GinataColors.outlineVariant),
-                _buildFinMetric('BALANCE DUE', balanceKes, isWarning: (double.tryParse(res['balance_due'].toString()) ?? 0) > 0),
+                Expanded(child: _buildFinMetric('BALANCE DUE', balanceKes, isWarning: (double.tryParse(res['balance_due'].toString()) ?? 0) > 0)),
               ],
             ),
           ),
@@ -671,6 +714,8 @@ class _ReservationDetailsSheetState extends State<_ReservationDetailsSheet> {
                       ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
@@ -678,14 +723,17 @@ class _ReservationDetailsSheetState extends State<_ReservationDetailsSheet> {
   Widget _buildFinMetric(String label, String value, {bool isPositive = false, bool isWarning = false}) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GinataColors.textSecondary)),
+        FittedBox(fit: BoxFit.scaleDown, child: Text(label, style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: GinataColors.textSecondary))),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: isPositive ? GinataColors.secondary : isWarning ? GinataColors.warningOchre : GinataColors.primary,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isPositive ? GinataColors.successSage : isWarning ? GinataColors.warningOchre : GinataColors.primary,
+            ),
           ),
         ),
       ],

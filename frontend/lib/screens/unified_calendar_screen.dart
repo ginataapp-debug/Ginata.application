@@ -359,11 +359,17 @@ class _UnifiedCalendarScreenState extends State<UnifiedCalendarScreen> {
                       ),
                       onPressed: () async {
                         Navigator.pop(sheetCtx);
+                        final g = res['primary_guest'] ?? {};
+                        final gName = '${g['first_name'] ?? ''} ${g['last_name'] ?? ''}'.trim();
                         final paid = await showDialog<bool>(
                           context: context,
                           builder: (_) => PaymentModal(
                             reservationId: res['id'].toString(),
                             suggestedAmount: double.tryParse(res['balance_due']?.toString() ?? '0') ?? 0,
+                            totalAmount: double.tryParse(res['total_amount']?.toString() ?? '0') ?? 0,
+                            amountPaid: double.tryParse(res['amount_paid']?.toString() ?? '0') ?? 0,
+                            balanceDue: double.tryParse(res['balance_due']?.toString() ?? '0') ?? 0,
+                            guestName: gName.isEmpty ? null : gName,
                           ),
                         );
                         if (paid == true) _loadCalendar();

@@ -31,6 +31,50 @@ class Organization(Base):
     invoices = relationship("Invoice", back_populates="organization", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="organization", cascade="all, delete-orphan")
     document_templates = relationship("DocumentTemplate", back_populates="organization", cascade="all, delete-orphan")
+    host_users = relationship("HostUser", back_populates="organization", cascade="all, delete-orphan")
+
+
+class HostUser(Base):
+    __tablename__ = "host_users"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    salt = Column(String(100), nullable=False)
+    full_name = Column(String(200), nullable=False)
+    phone = Column(String(50), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    session_token = Column(String(255), nullable=True, index=True)
+    last_login_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    organization = relationship("Organization", back_populates="host_users")
+
+
+class HostSession(Base):
+    __tablename__ = "host_sessions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    host_id = Column(String(36), ForeignKey("host_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class HostEmailVerification(Base):
+    __tablename__ = "host_email_verifications"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    host_id = Column(String(36), ForeignKey("host_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    email = Column(String(255), nullable=False)
+    code_hash = Column(String(255), nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    consumed_at = Column(DateTime, nullable=True)
+    attempts = Column(Integer, default=0, nullable=False)
 
 
 class Property(Base):
@@ -568,3 +612,21 @@ class Message(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     thread = relationship("MessageThread", back_populates="messages")
+
+
+class MessageTemplate(Base):
+    """Pre-built, reusable guest messages a host can copy & paste into Airbnb,
+    Booking.com, WhatsApp, SMS or email. Scoped per organization so it follows
+    the host across devices."""
+    __tablename__ = "message_templates"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    category = Column(String(50), default="general", nullable=False)  # airbnb, booking_com, whatsapp, sms, email, general
+    body = Column(Text, nullable=False)
+    variables = Column(JSON, nullable=True)  # list of {{placeholder}} keys used in body
+    is_active = Column(Boolean, default=True, nullable=False)
+    use_count = Column(Integer, default=0, nullable=False)  # times copied by the host
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
