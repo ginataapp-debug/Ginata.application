@@ -49,7 +49,8 @@ class GinataFormatters {
   static String formatKES(dynamic amount, {bool showDecimals = false}) {
     if (amount == null) return 'KES 0';
     final numVal = num.tryParse(amount.toString()) ?? 0;
-    if (showDecimals) {
+    final cents = (numVal * 100).round();
+    if (showDecimals || cents % 100 != 0) {
       return _kesFormatDecimals.format(numVal);
     }
     return _kesFormat.format(numVal);

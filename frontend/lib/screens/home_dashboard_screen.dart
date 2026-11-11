@@ -19,6 +19,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   Map<String, dynamic> _financialSummary = {};
   int _propertyCount = 0;
   bool _isLoading = true;
+  bool? _isOnline;
   String _hostName = 'Host';
   String _hostInitial = 'H';
 
@@ -41,14 +42,18 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   Future<void> _loadDashboardData() async {
     setState(() => _isLoading = true);
-    final res = await ApiService.fetchReservations();
-    final finances = await ApiService.fetchFinancialSummary();
-    final props = await ApiService.fetchProperties();
+    final results = await Future.wait([
+      ApiService.fetchReservations(),
+      ApiService.fetchFinancialSummary(),
+      ApiService.fetchProperties(),
+      ApiService.checkServerConnection(),
+    ]);
     if (mounted) {
       setState(() {
-        _reservations = res;
-        _financialSummary = finances;
-        _propertyCount = props.length;
+        _reservations = results[0] as List<dynamic>;
+        _financialSummary = results[1] as Map<String, dynamic>;
+        _propertyCount = (results[2] as List<dynamic>).length;
+        _isOnline = (results[3] as ServerConnection).isOnline;
         _isLoading = false;
       });
     }
@@ -102,7 +107,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         title: Row(
           children: [
             Image.asset(
-              'assets/images/logo.png',
+              'assets/images/brand_mark.png',
               height: 32,
               errorBuilder: (context, error, stackTrace) => const Icon(
                 Icons.villa, color: GinataColors.primary, size: 28,
@@ -147,7 +152,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   ),
               ],
             ),
-            onPressed: () => widget.onNavigateTab(3),
+            onPressed: () => widget.onNavigateTab(9),
           ),
           Padding(
             padding: const EdgeInsets.only(right: 16, left: 4),
@@ -202,31 +207,34 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: GinataColors.successContainer,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 6, height: 6,
-                        decoration: const BoxDecoration(
-                          color: GinataColors.successSage, shape: BoxShape.circle,
-                        ),
+                Builder(
+                  builder: (context) {
+                    final online = _isOnline == true;
+                    final checking = _isOnline == null;
+                    final color = checking
+                        ? GinataColors.secondary
+                        : online
+                            ? GinataColors.successSage
+                            : GinataColors.alertTerracotta;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      const SizedBox(width: 5),
-                      const Text(
-                        'Online',
-                        style: TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w700,
-                          color: GinataColors.successSage,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+                          const SizedBox(width: 5),
+                          Text(
+                            checking ? 'Checking' : online ? 'Online' : 'Offline',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -295,7 +303,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Net Host Profit',
+                    'Projected Net Host Profit',
                     style: TextStyle(
                       color: Colors.white60, fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -377,13 +385,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               children: [
                 Expanded(child: _actionCard(Icons.add_circle_outline, 'New Booking', _openManualBookingModal)),
                 const SizedBox(width: 10),
-                Expanded(child: _actionCard(Icons.calendar_month_outlined, 'Calendar', () => widget.onNavigateTab(2))),
+                Expanded(child: _actionCard(Icons.track_changes_outlined, 'Stay Tracker', () => widget.onNavigateTab(9))),
               ],
             ),
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _actionCard(Icons.receipt_long_outlined, 'Invoices', () => widget.onNavigateTab(7))),
+                Expanded(child: _actionCard(Icons.calendar_month_outlined, 'Calendar', () => widget.onNavigateTab(2))),
                 const SizedBox(width: 10),
                 Expanded(child: _actionCard(Icons.account_balance_wallet_outlined, 'Finances', () => widget.onNavigateTab(4))),
               ],

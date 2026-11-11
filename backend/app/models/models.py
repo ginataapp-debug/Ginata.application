@@ -77,6 +77,31 @@ class HostEmailVerification(Base):
     attempts = Column(Integer, default=0, nullable=False)
 
 
+class GoogleOAuthState(Base):
+    __tablename__ = "google_oauth_states"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    host_id = Column(String(36), ForeignKey("host_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    nonce_hash = Column(String(64), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    consumed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class GoogleOAuthCredential(Base):
+    __tablename__ = "google_oauth_credentials"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    host_id = Column(String(36), ForeignKey("host_users.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    provider_account_id = Column(String(255), unique=True, nullable=False)
+    email = Column(String(255), nullable=False)
+    encrypted_refresh_token = Column(Text, nullable=False)
+    scopes = Column(JSON, nullable=False, default=list)
+    last_refreshed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class Property(Base):
     __tablename__ = "properties"
 
@@ -286,6 +311,71 @@ class GuestFormSubmission(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     reservation = relationship("Reservation", back_populates="guest_form_submissions")
+
+
+class GoogleFormSyncState(Base):
+    __tablename__ = "google_form_sync_states"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    guest_form_id = Column(String(36), ForeignKey("guest_forms.id", ondelete="CASCADE"), unique=True, nullable=False)
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    host_id = Column(String(36), ForeignKey("host_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    google_form_id = Column(String(255), nullable=False, index=True)
+    responder_uri = Column(String(500), nullable=True)
+    question_map = Column(JSON, nullable=True)
+    last_response_time = Column(String(64), nullable=True)
+    watch_id = Column(String(255), nullable=True, index=True)
+    watch_expires_at = Column(DateTime, nullable=True)
+    consecutive_failures = Column(Integer, default=0, nullable=False)
+    next_attempt_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class GoogleFormResponse(Base):
+    __tablename__ = "google_form_responses"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    host_id = Column(String(36), ForeignKey("host_users.id", ondelete="CASCADE"), nullable=False, index=True)
+    guest_form_id = Column(String(36), ForeignKey("guest_forms.id", ondelete="CASCADE"), nullable=False, index=True)
+    google_form_id = Column(String(255), nullable=False)
+    google_response_id = Column(String(255), nullable=False)
+    reservation_id = Column(String(36), ForeignKey("reservations.id", ondelete="SET NULL"), nullable=True, index=True)
+    submission_id = Column(String(36), ForeignKey("guest_form_submissions.id", ondelete="SET NULL"), nullable=True)
+    match_status = Column(String(30), default="unmatched", nullable=False)  # matched, unmatched
+    sync_status = Column(String(30), default="processing", nullable=False)  # processing, synced, pending_review, failed
+    match_reason = Column(String(255), nullable=True)
+    guest_name = Column(String(200), nullable=True)
+    guest_email = Column(String(255), nullable=True)
+    guest_phone = Column(String(50), nullable=True)
+    booking_reference = Column(String(100), nullable=True)
+    check_in_date = Column(Date, nullable=True)
+    answers = Column(JSON, nullable=True)
+    submitted_at = Column(DateTime, nullable=True)
+    attempts = Column(Integer, default=0, nullable=False)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("google_form_id", "google_response_id", name="uq_google_form_response"),
+    )
+
+
+class HostNotification(Base):
+    __tablename__ = "host_notifications"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    body = Column(Text, nullable=True)
+    entity_type = Column(String(50), nullable=True)
+    entity_id = Column(String(36), nullable=True)
+    dedupe_key = Column(String(255), unique=True, nullable=True)
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
 class Invoice(Base):

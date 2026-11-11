@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#173e35">
+  <meta name="description" content="Meet Ginata: a calmer way to manage your properties, bookings, guest messages, payments and invoices. Thoughtfully made for short-stay hosts.">
+  <meta property="og:title" content="Ginata — Great stays. Calmer days.">
+  <meta property="og:description" content="Your properties, bookings and finances. Beautifully brought together. Discover a more thoughtful way to host.">
+  <meta property="og:type" content="website">
+  <title>Ginata — Great stays. Calmer days.</title>
+  <link rel="icon" type="image/webp" href="assets/ginata-tree.webp">
+  <link rel="preload" href="assets/dm-serif.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/dm-sans-regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-up-right" viewBox="0 0 24 24"><path d="M6 18 18 6M6 6h12v12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10H3ZM9 20v-7h6v7"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18m-13 4h1m6 0h1m-8 3h1"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M20 8V5H5a2 2 0 0 0 0 4h16v11H5a2 2 0 0 1-2-2V7m18 6h-6v4h6m-3-2h.1"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 11a8 8 0 0 1-8 8H6l-4 3 1.7-6A8 8 0 1 1 21 11Z"/><path d="M7 9h10M7 13h6"/></symbol>
+    <symbol id="i-document" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8Zm0 0v6h5M8 13h8m-8 4h6"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="5"/><path d="m11.5 11.5 9 9m-3-3 3-3m-6 0 3-3"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M20 3C7 2 1 9 6 16s15 2 14-13ZM4 21 16 8"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 5h4m-3 14h2"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M12 17v5m-5 0h10"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6Zm-5 9 3 3 6-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V3H3v13h5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 1v2m0 18v2M1 12h2m18 0h2M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V3h12v18M16 10h5v11M1 21h22M8 7h1m3 0h1m-5 4h1m3 0h1m-5 4h1m3 0h1m-3 6v-3"/></symbol>
+  </svg>
+
+  <div class="announcement"><svg class="icon"><use href="#i-leaf"/></svg> A little less admin. A lot more hospitality. <a href="#workspace">Meet Ginata <span aria-hidden="true">↗</span></a></div>
+  <header class="site-header" id="site-header">
+    <div class="container nav-container">
+      <a class="brand" href="#" aria-label="Ginata home"><img src="assets/ginata-tree.webp" alt="" width="37" height="42"><span>ginata<small>PROPERTY MANAGEMENT</small></span></a>
+      <button class="menu-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav"><span></span><span></span></button>
+      <nav class="site-nav" id="site-nav" aria-label="Main navigation">
+        <a href="#features">Why Ginata</a><a href="#workspace">The experience</a><a href="#how-it-works">How it works</a><a href="#faq">FAQs</a>
+        <div class="nav-actions"><a class="button button-small button-outline" href="app/">Sign in</a><a class="button button-small button-dark" href="download.html">Download app <svg class="icon"><use href="#i-download"/></svg></a></div>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero container">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> YOUR SPACE TO HOST BETTER</p>
+        <h1>Great stays.<br><em>Calmer days.</em></h1>
+        <p class="hero-description">You bring the hospitality.<br>We bring everything else together.</p>
+        <p class="hero-detail">Your properties, bookings, guests and finances.<br class="desktop-break"> One thoughtful app. A little more peace of mind.</p>
+        <div class="hero-actions"><a class="button button-dark" href="app/?mode=signup">Create your host account <svg class="icon"><use href="#i-arrow"/></svg></a><a class="button button-outline" href="download.html">Download mobile app <svg class="icon"><use href="#i-download"/></svg></a></div>
+        <p class="hero-signin">Already hosting with Ginata? <a class="contact-link" href="app/">Sign in</a></p>
+        <div class="hero-footnote"><svg class="icon"><use href="#i-phone"/></svg><svg class="icon"><use href="#i-monitor"/></svg><span>Made for Android &amp; web.<br><strong>Made for the way you host.</strong></span></div>
+      </div>
+      <div class="hero-visual">
+        <div class="hero-photo"><img src="assets/villa.webp" alt="A warmly lit contemporary home surrounded by trees at dusk" width="1600" height="1067" fetchpriority="high"><span class="photo-caption"><svg class="icon"><use href="#i-home"/></svg> Good spaces deserve great hosting.</span></div>
+        <div class="orbit-label" aria-hidden="true"><svg class="icon"><use href="#i-leaf"/></svg><span>ROOM TO<br>GROW.</span></div>
+        <div class="arrival-card floating-card"><div class="card-overline"><span class="status-dot"></span> A LITTLE MORE ORGANISED</div><div class="arrival-body"><span class="avatar avatar-sage">WM</span><div><strong>Your next guest, all set.</strong><span>Check-in details. Right where you need them.</span></div><span class="check-circle"><svg class="icon"><use href="#i-check"/></svg></span></div></div>
+        <span class="hero-caption">LESS TO JUGGLE. MORE TO LOOK FORWARD TO.</span>
+        <svg class="hero-scribble" viewBox="0 0 90 100" fill="none" aria-hidden="true"><path d="M5 7c56-8 78 18 49 34-20 12-33-5-15-12 25-10 36 29 24 59m-9-9 9 13 14-10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+    </section>
+
+    <section class="property-types container" aria-label="Who Ginata is for"><p>FOR THE SPACES<br>YOU CARE ABOUT</p><span><svg class="icon"><use href="#i-key"/></svg> Short stays</span><span><svg class="icon"><use href="#i-home"/></svg> Holiday homes</span><span><svg class="icon"><use href="#i-building"/></svg> Serviced apartments</span><span><svg class="icon"><use href="#i-grid"/></svg> Growing portfolios</span></section>
+
+    <section class="account-section container" id="account" aria-labelledby="account-title">
+      <div class="section-heading centered reveal"><p class="eyebrow">YOUR WORKSPACE IS READY</p><h2 id="account-title">Sign in. Sign up.<br><em>Or take Ginata with you.</em></h2><p>Use Ginata right here in your browser, or download the mobile app.<br>One host account works on both.</p></div>
+      <div class="account-grid">
+        <article class="account-card account-card-light reveal"><span class="feature-icon"><svg class="icon"><use href="#i-key"/></svg></span><h3>Welcome back.</h3><p>Already have a host account? Sign in to the Ginata web app to see your properties, bookings, guests and finances.</p><a class="button button-outline" href="app/">Sign in to Ginata <svg class="icon"><use href="#i-arrow"/></svg></a></article>
+        <article class="account-card feature-green reveal"><span class="feature-icon"><svg class="icon"><use href="#i-leaf"/></svg></span><h3>New to Ginata?</h3><p>Create your host account in a minute. Add your first property and start organising your stays straight away.</p><a class="button button-cream" href="app/?mode=signup">Create your account <svg class="icon"><use href="#i-arrow"/></svg></a></article>
+        <article class="account-card reveal"><span class="feature-icon"><svg class="icon"><use href="#i-phone"/></svg></span><h3>Host from your phone.</h3><p>Prefer an app? Download Ginata for Android and sign in with the same account you use on the web.</p><a class="button button-dark" href="download.html">Download mobile app <svg class="icon"><use href="#i-download"/></svg></a></article>
+      </div>
+      <p class="account-note"><svg class="icon"><use href="#i-shield"/></svg><span>The web app and the mobile app share the same features and the same secure host account. Questions? Email <a class="contact-link" href="mailto:ginata.app@gmail.com">ginata.app@gmail.com</a>.</span></p>
+    </section>
+
+    <section class="workspace-section section" id="workspace">
+      <div class="container">
+        <div class="section-heading centered reveal"><p class="eyebrow">A PLACE FOR EVERYTHING</p><h2>Your hosting day.<br><em>With a little more clarity.</em></h2><p>From the first hello to the final receipt, see what matters.<br>Without jumping between spreadsheets and conversations.</p></div>
+        <div class="preview-tabs" role="tablist" aria-label="Explore Ginata features">
+          <button id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview"><svg class="icon"><use href="#i-grid"/></svg> At a glance</button>
+          <button id="tab-calendar" role="tab" aria-selected="false" aria-controls="panel-calendar" tabindex="-1" data-tab="calendar"><svg class="icon"><use href="#i-calendar"/></svg> Stay organised</button>
+          <button id="tab-finances" role="tab" aria-selected="false" aria-controls="panel-finances" tabindex="-1" data-tab="finances"><svg class="icon"><use href="#i-wallet"/></svg> Know your numbers</button>
+          <button id="tab-messages" role="tab" aria-selected="false" aria-controls="panel-messages" tabindex="-1" data-tab="messages"><svg class="icon"><use href="#i-message"/></svg> Make guests feel at home</button>
+        </div>
+        <div class="app-preview reveal">
+          <div class="preview-chrome"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span><svg class="icon"><use href="#i-shield"/></svg> Your Ginata workspace</span><span class="preview-label">INTERACTIVE PREVIEW</span></div>
+          <div class="preview-layout">
+            <aside class="preview-sidebar" aria-label="Preview navigation"><span class="preview-brand"><img src="assets/ginata-tree.webp" alt="" width="25" height="29"> ginata</span><small>YOUR WORKSPACE</small><button class="side-tab active" data-preview-target="overview"><svg class="icon"><use href="#i-grid"/></svg> Overview</button><button class="side-tab" data-preview-target="calendar"><svg class="icon"><use href="#i-calendar"/></svg> Stay tracker</button><button class="side-tab" data-preview-target="finances"><svg class="icon"><use href="#i-wallet"/></svg> Finances</button><button class="side-tab" data-preview-target="messages"><svg class="icon"><use href="#i-message"/></svg> Messages</button><div class="sidebar-bottom"><span class="avatar avatar-sage">AK</span><div>Amani's spaces<small>HOST WORKSPACE</small></div></div></aside>
+            <div class="preview-main">
+              <section class="preview-panel" id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
+                <div class="app-heading"><div><span class="app-eyebrow">WEDNESDAY, 11 NOVEMBER</span><h3>A good day to host, Amani <svg class="icon sun-icon"><use href="#i-sun"/></svg></h3><p>Here's how your spaces are doing today.</p></div><span class="app-status"><span class="status-dot"></span> All in view</span></div>
+                <div class="metrics"><div><span>Booking value</span><strong><small>KES</small> 148,500</strong><p>Across your current stays</p></div><div><span>Payments received</span><strong><small>KES</small> 124,250</strong><p><i class="tiny-dot"></i> 84% collected</p></div><div><span>Balance to collect</span><strong><small>KES</small> 24,250</strong><p>One balance to follow up</p></div></div>
+                <div class="app-columns"><div class="today-card"><div class="mini-heading"><h4>Today's little to-dos</h4><span>2 movements</span></div><div class="guest-row"><span class="avatar avatar-sage">WM</span><div><strong>Wanjiku Mwangi</strong><span>Garden Loft · 2 guests</span></div><span class="tag tag-green">Arriving</span></div><div class="guest-row"><span class="avatar avatar-peach">DO</span><div><strong>David Otieno</strong><span>The Riverside · 1 guest</span></div><span class="tag tag-peach">Departing</span></div><button class="mini-link" data-preview-target="calendar">Open your stay tracker <svg class="icon"><use href="#i-arrow"/></svg></button></div><div class="property-preview"><img src="assets/interior.webp" alt="An airy living room with natural finishes" loading="lazy" width="600" height="400"><div><span>YOUR SPACES</span><strong>Every detail. In one place.</strong><small>Property profiles, rates &amp; stay information.</small></div></div></div>
+              </section>
+              <section class="preview-panel" id="panel-calendar" role="tabpanel" aria-labelledby="tab-calendar" tabindex="0" hidden>
+                <div class="app-heading"><div><span class="app-eyebrow">ROOM FOR A CLEARER PLAN</span><h3>Know who's coming. And going.</h3><p>Try selecting a date in this sample calendar.</p></div><span class="tag tag-green">Stay tracker</span></div>
+                <div class="calendar-layout"><div class="calendar-card"><div class="mini-heading"><button class="icon-button" id="previous-month" aria-label="Previous month"><svg class="icon rotate"><use href="#i-chevron"/></svg></button><h4 id="calendar-month">November 2026</h4><button class="icon-button" id="next-month" aria-label="Next month"><svg class="icon"><use href="#i-chevron"/></svg></button></div><div class="calendar-weekdays" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div><div class="calendar-grid" id="calendar-days" aria-label="Choose a date"></div><div class="calendar-legend"><i></i> Sample stay dates <span>Click a day to explore</span></div></div><div class="day-detail" aria-live="polite"><span class="app-eyebrow" id="selected-date">WEDNESDAY, 11 NOVEMBER</span><h4 id="day-title">Two moments to plan for.</h4><div id="day-events"></div><p class="demo-hint">In the app, your tracker brings arrivals, departures and outstanding payments together.</p></div></div>
+              </section>
+              <section class="preview-panel" id="panel-finances" role="tabpanel" aria-labelledby="tab-finances" tabindex="0" hidden>
+                <div class="app-heading"><div><span class="app-eyebrow">THE NUMBERS, WITHOUT THE GUESSWORK</span><h3>A clearer picture of your money.</h3><p>Explore the sample financial breakdown.</p></div><label class="property-select">Property<select id="finance-property"><option value="all">All properties</option><option value="garden">Garden Loft</option><option value="riverside">The Riverside</option><option value="palm">Palm Cottage</option></select></label></div>
+                <div class="finance-layout"><div class="finance-card"><span>Projected host profit</span><strong id="finance-profit">KES 119,000</strong><p>Booking value minus commissions &amp; expenses.</p><div class="finance-bars" aria-hidden="true"><i style="--height:34%"></i><i style="--height:53%"></i><i style="--height:43%"></i><i style="--height:71%"></i><i style="--height:61%"></i><i style="--height:87%"></i><i style="--height:76%"></i><i style="--height:100%"></i></div><small>Illustrative chart · not historical earnings</small></div><div class="finance-breakdown"><h4>Every amount, accounted for.</h4><dl><div><dt>Booking value</dt><dd id="finance-gross">KES 148,500</dd></div><div><dt>Agent commissions</dt><dd id="finance-commission">− KES 7,000</dd></div><div><dt>Property expenses</dt><dd id="finance-expenses">− KES 22,500</dd></div><div class="total-row"><dt>Payments received</dt><dd id="finance-paid">KES 124,250</dd></div><div><dt>Balance to collect</dt><dd id="finance-balance">KES 24,250</dd></div></dl><span class="finance-note"><svg class="icon"><use href="#i-document"/></svg> Profit and cash collected are shown separately.</span></div></div>
+              </section>
+              <section class="preview-panel" id="panel-messages" role="tabpanel" aria-labelledby="tab-messages" tabindex="0" hidden>
+                <div class="app-heading"><div><span class="app-eyebrow">THOUGHTFUL WORDS. READY WHEN YOU ARE.</span><h3>A warmer welcome, on repeat.</h3><p>Choose a template. Make it yours. Copy and send.</p></div></div>
+                <div class="message-layout"><div class="message-options" aria-label="Sample message templates"><button class="message-option selected" data-message="welcome" aria-pressed="true"><svg class="icon"><use href="#i-home"/></svg><span>A warm welcome<small>Before your guest arrives</small></span></button><button class="message-option" data-message="checkin" aria-pressed="false"><svg class="icon"><use href="#i-key"/></svg><span>Check-in made simple<small>All the practical details</small></span></button><button class="message-option" data-message="checkout" aria-pressed="false"><svg class="icon"><use href="#i-sun"/></svg><span>Until next time<small>A thoughtful farewell</small></span></button></div><div class="message-editor"><div class="mini-heading"><h4 id="message-title">A warm welcome</h4><span class="tag tag-green">READY TO PERSONALISE</span></div><label class="sr-only" for="message-content">Edit sample guest message</label><textarea id="message-content" spellcheck="true">Hi [Guest name], we're so happy you'll be staying with us at [Property name]! Your space will be ready from [Check-in time] on [Date]. We'll send your arrival details before your stay. If you have any questions, just ask. See you soon!</textarea><div class="message-footer"><small>Replace the [placeholders] before sending.</small><button class="button button-small button-dark" id="copy-message"><svg class="icon"><use href="#i-copy"/></svg> Copy message</button></div><span id="copy-status" class="copy-status" role="status"></span></div></div>
+              </section>
+            </div>
+          </div>
+        </div>
+        <p class="preview-disclaimer"><span class="status-dot"></span> A small taste of Ginata. Interactive illustration with sample data—not a connected host account.</p>
+      </div>
+    </section>
+
+    <section class="features-section section container" id="features">
+      <div class="section-heading split-heading reveal"><div><p class="eyebrow">LESS BUSYWORK. BETTER HOSTING.</p><h2>All the little things.<br><em>Working together.</em></h2></div><p>Because hosting isn't just a booking.<br>It's the details before, during and after.<br>Ginata helps you keep them all in hand.</p></div>
+      <div class="feature-grid">
+        <article class="feature-card reveal"><span class="feature-icon"><svg class="icon"><use href="#i-home"/></svg></span><span class="feature-number">01</span><h3>Your spaces, beautifully organised.</h3><p>Keep property photos, rates, locations and the details that make each place yours in one portfolio.</p><div class="feature-bottom"><span>PROPERTY MANAGEMENT</span><svg class="icon"><use href="#i-up-right"/></svg></div></article>
+        <article class="feature-card reveal"><span class="feature-icon"><svg class="icon"><use href="#i-calendar"/></svg></span><span class="feature-number">02</span><h3>From booked<br>to checked out.</h3><p>Plan stay dates, track guests and see upcoming arrivals. Import and export iCal dates for supported channels.</p><div class="feature-bottom"><span>BOOKINGS &amp; STAY TRACKER</span><svg class="icon"><use href="#i-up-right"/></svg></div></article>
+        <article class="feature-card feature-green reveal"><span class="feature-icon"><svg class="icon"><use href="#i-wallet"/></svg></span><span class="feature-number">03</span><h3>Know what's paid.<br>And what's pending.</h3><p>Record full or partial payments, keep transaction references, and follow balances without losing the cents.</p><div class="feature-bottom"><span>PAYMENTS &amp; BALANCES</span><svg class="icon"><use href="#i-up-right"/></svg></div></article>
+        <article class="feature-card reveal"><span class="feature-icon"><svg class="icon"><use href="#i-document"/></svg></span><span class="feature-number">04</span><h3>The finishing touch.<br>Made professional.</h3><p>Create branded invoices and receipts. Preview the full page, choose your layout, and download a PDF to share.</p><div class="feature-bottom"><span>INVOICES &amp; RECEIPTS</span><svg class="icon"><use href="#i-up-right"/></svg></div></article>
+        <article class="feature-card reveal"><span class="feature-icon"><svg class="icon"><use href="#i-message"/></svg></span><span class="feature-number">05</span><h3>A personal welcome.<br>Without starting over.</h3><p>Create reusable guest messages for arrivals, house details and goodbyes. Edit, copy, and paste where you chat.</p><div class="feature-bottom"><span>GUEST MESSAGE TEMPLATES</span><svg class="icon"><use href="#i-up-right"/></svg></div></article>
+        <article class="feature-card feature-peach reveal"><span class="feature-icon"><svg class="icon"><use href="#i-grid"/></svg></span><span class="feature-number">06</span><h3>The bigger picture.<br>Down to the details.</h3><p>See booking revenue, commissions and property expenses together, with projected profit separate from cash received.</p><div class="feature-bottom"><span>FINANCES &amp; EXPENSES</span><svg class="icon"><use href="#i-up-right"/></svg></div></article>
+      </div>
+    </section>
+
+    <section class="host-section section" id="for-hosts"><div class="container host-layout"><div class="host-image reveal"><img src="assets/interior.webp" alt="A welcoming sunlit lounge with soft seating and natural textures" width="1200" height="800" loading="lazy"><div class="image-note"><svg class="icon"><use href="#i-leaf"/></svg><span>A place for your guests.<br><strong>A little space for you.</strong></span></div></div><div class="host-copy reveal"><p class="eyebrow">HOSTING IS PERSONAL. WE GET IT.</p><h2>Built around real life.<br><em>Not the other<br>way around.</em></h2><p>One apartment or a growing collection of stays. A booking on the phone or a guest at your door. Ginata makes room for the way your business actually works.</p><ul class="check-list"><li><svg class="icon"><use href="#i-check"/></svg><span><strong>Local details, thoughtfully considered.</strong><br>KES amounts, M-Pesa references and direct bookings.</span></li><li><svg class="icon"><use href="#i-check"/></svg><span><strong>Your workspace, wherever you settle in.</strong><br>Account-based access across supported devices.</span></li><li><svg class="icon"><use href="#i-check"/></svg><span><strong>Start with one space. Keep growing.</strong><br>A clear home for your property portfolio.</span></li></ul><a class="text-link" href="#how-it-works">Make yourself at home <svg class="icon"><use href="#i-arrow"/></svg></a></div></div></section>
+
+    <section class="steps-section section container" id="how-it-works"><div class="section-heading centered reveal"><p class="eyebrow">A FRESH START, NOT A BIG PROJECT</p><h2>Settle in.<br><em>You're in good company.</em></h2><p>A simpler hosting routine starts with a few little steps.</p></div><ol class="steps"><li class="reveal"><div class="step-top"><span>01</span><svg class="icon"><use href="#i-key"/></svg></div><h3>Create your host account.</h3><p>Make a home for your business with your own sign-in and host profile.</p></li><li class="reveal"><div class="step-top"><span>02</span><svg class="icon"><use href="#i-home"/></svg></div><h3>Bring your spaces together.</h3><p>Add your properties, set your rates and record your upcoming bookings.</p></li><li class="reveal"><div class="step-top"><span>03</span><svg class="icon"><use href="#i-leaf"/></svg></div><h3>Find your everyday flow.</h3><p>Check your tracker, welcome your guests and stay on top of the numbers.</p></li></ol></section>
+
+    <section class="faq-section section" id="faq"><div class="container faq-layout"><div class="section-heading reveal"><p class="eyebrow">GOOD QUESTIONS. CLEAR ANSWERS.</p><h2>A few things<br><em>you might wonder.</em></h2><p>Getting to know your new<br>hosting companion.</p><span class="faq-decoration" aria-hidden="true">?</span></div><div class="faq-list reveal">
+      <details open><summary>Who is Ginata made for?<span aria-hidden="true"></span></summary><p>Ginata is built for hosts managing short stays, holiday homes and serviced apartments. Whether you manage one property or several, it brings everyday reservations, guest details, payments and property expenses into one workspace.</p></details>
+      <details><summary>Can I manage direct and Airbnb bookings?<span aria-hidden="true"></span></summary><p>Yes. You can record bookings from different sources, including direct, phone and Airbnb stays. Ginata supports iCal calendar import and export for supported channels. iCal shares availability dates; it is not an instant, full reservation or messaging integration.</p></details>
+      <details><summary>Does Ginata process M-Pesa payments?<span aria-hidden="true"></span></summary><p>Ginata lets you record payments received through M-Pesa, bank transfer, cash or card, attach the actual transaction reference and track the remaining balance. Recording a payment is not the same as collecting it through a payment gateway. Host checks are labeled as manual verification.</p></details>
+      <details><summary>Can I download my invoices and receipts?<span aria-hidden="true"></span></summary><p>Yes. You can create invoices and receipts, choose document layouts, preview PDFs with zoom controls and download them to your device. Your documents include the relevant host, guest, payment and booking details.</p></details>
+      <details><summary>How does my host account work?<span aria-hidden="true"></span></summary><p>You have your own host account and account-based workspace. The native app uses secure device storage for session credentials, and signing out revokes that device's session. Email confirmation is available when enabled on the hosted service. Always use HTTPS and sign out on shared devices.</p></details>
+      <details><summary>Where can I use Ginata?<span aria-hidden="true"></span></summary><p>Sign in or create an account in the Ginata web app straight from this website, or download the Android app from the download page. Both use the same host account and the same features. The Android build is a preview release that you install directly, not yet a Play Store listing.</p></details>
+      <details><summary>How do I get help?<span aria-hidden="true"></span></summary><p>Email the Ginata team at <a class="contact-link" href="mailto:ginata.app@gmail.com">ginata.app@gmail.com</a>. Please never send passwords, ID documents or payment details by email.</p></details>
+    </div></div></section>
+
+    <section class="closing-section container"><div class="closing-card reveal"><div class="closing-copy"><p class="eyebrow">MAKE ROOM FOR WHAT MATTERS</p><h2>Less managing.<br><em>More welcoming.</em></h2><p>Your next chapter in hosting starts with a calmer day.</p><div class="closing-actions"><a class="button button-cream" href="app/?mode=signup">Create your host account <svg class="icon"><use href="#i-arrow"/></svg></a><a href="download.html">Download mobile app <span aria-hidden="true">↗</span></a></div></div><svg class="botanical" viewBox="0 0 360 440" fill="none" aria-hidden="true"><path d="M167 446c-15-95-10-184 31-294M158 378C61 371 25 307 31 232c83 6 131 63 127 146Zm3-52c87-7 149-75 141-155-85 2-135 71-141 155Zm24-119C107 185 88 113 103 53c69 19 110 88 82 154Zm23-61C262 119 281 61 260 9c-63 25-78 80-52 137Z" stroke="currentColor" stroke-width="1.5"/><path d="M41 252c54 37 92 74 117 126m127-186c-52 44-91 90-124 134M111 72c25 51 54 92 74 135m70-177c-15 42-31 72-47 116" stroke="currentColor" stroke-width="1"/></svg></div></section>
+  </main>
+
+  <footer class="site-footer container"><div class="footer-top"><div><a class="brand" href="#" aria-label="Ginata home"><img src="assets/ginata-tree.webp" alt="" width="37" height="42"><span>ginata<small>PROPERTY MANAGEMENT</small></span></a><p>Thoughtfully made for hosts.<br>And the spaces they care about.</p><p class="footer-contact">Contact us: <a class="contact-link" href="mailto:ginata.app@gmail.com">ginata.app@gmail.com</a></p></div><div class="footer-links"><div><h3>Explore</h3><a href="#features">Why Ginata</a><a href="#workspace">The experience</a><a href="#how-it-works">Getting started</a></div><div><h3>Your account</h3><a href="app/">Sign in</a><a href="app/?mode=signup">Create an account</a><a href="download.html">Download mobile app</a></div><div><h3>A little more</h3><a href="#faq">Common questions</a><a href="mailto:ginata.app@gmail.com">Email us</a><button type="button" id="privacy-button">Website privacy</button></div></div><span class="footer-signoff">A little more<br><em>peace of mind.</em><svg class="icon"><use href="#i-leaf"/></svg></span></div><div class="footer-bottom"><span>© <span id="year">2026</span> Ginata Property Management.</span><span>Made with intention. Built for hospitality.</span><a href="#main">Back to top ↑</a></div></footer>
+
+  <dialog class="privacy-dialog" id="privacy-dialog" aria-labelledby="privacy-title"><button class="dialog-close icon-button" type="button" data-close-dialog aria-label="Close privacy information"><svg class="icon"><use href="#i-close"/></svg></button><p class="eyebrow">A NOTE ON THIS WEBSITE</p><h2 id="privacy-title">Your visit.<br><em>Simply explained.</em></h2><p>This promotional website does not include analytics, advertising trackers or a mailing-list form. Sign-in and account creation happen inside the Ginata web app, which connects securely to the Ginata service. Images and fonts are served locally. Your hosting provider may keep standard request logs.</p><p>The interactive workspace uses fictional sample data. Changes you make in the preview stay in the current page and are not sent to a server. The copy button writes the message you choose to your clipboard.</p><p>This is website information, not a privacy policy for the Ginata app. The app connects to its hosted service when you sign in. Questions: <a class="contact-link" href="mailto:ginata.app@gmail.com">ginata.app@gmail.com</a>.</p><p class="image-credit">Property photography sourced from Unsplash. Images illustrate the hosting experience and are not Ginata-owned rental listings.</p></dialog>
+  <noscript><div class="noscript-note">JavaScript is off. You can still explore the site and FAQs. <a href="app/">Sign in</a> · <a href="download.html">Download the mobile app</a>.</div></noscript>
+</body>
+</html>

@@ -101,7 +101,7 @@ Under **Environment Variables**, add:
 | `PYTHONUNBUFFERED` | `1` | Real-time console logs |
 
 Click **Create Web Service**. Within 3 minutes, Render will build and deploy your backend at:
-`https://ginata-api.onrender.com`
+`https://ginata-backend.onrender.com`
 
 ---
 
@@ -110,7 +110,7 @@ Click **Create Web Service**. Within 3 minutes, Render will build and deploy you
 ### Step 4.1: Build Flutter Web for Production
 In your terminal, navigate to the `frontend` folder and build with your live Render backend URL:
 ```bash
-flutter build web --release --dart-define=API_URL=https://ginata-api.onrender.com/api/v1
+flutter build web --release --dart-define=API_URL=https://ginata-backend.onrender.com/api/v1
 ```
 This compiles your entire Flutter application into pure HTML, CSS, JavaScript, and WebAssembly in `frontend/build/web/`.
 
@@ -133,15 +133,38 @@ This compiles your entire Flutter application into pure HTML, CSS, JavaScript, a
 
 You do not need to pay $25 to Google Play Console or wait for approval to use the app on mobile:
 
-1. Build the Android package:
+1. Build the Android package with the same live API URL:
    ```bash
-   flutter build apk --release
+   flutter build apk --release --dart-define=API_URL=https://ginata-backend.onrender.com/api/v1
    ```
 2. The generated APK will be at:
    `frontend/build/app/outputs/flutter-apk/app-release.apk`
 3. Send this file to your phone via WhatsApp, Google Drive, or USB cable.
 4. Tap the file on your Android phone and click **Install**.
-5. You now have the Ginata Property Management app installed natively with its custom forest-green icon!
+5. The release manifest includes `android.permission.INTERNET`; debug/profile manifests alone are not enough for a release APK.
+
+### Google Play / store signing
+
+The project supports an upload key through `frontend/android/key.properties`.
+Without that file, release builds fall back to the debug key and are only for
+internal testing, not store publication.
+
+1. Create a private upload keystore (keep it backed up; losing it prevents future updates):
+   ```bash
+   keytool -genkey -v -keystore frontend/android/app/upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+2. Create `frontend/android/key.properties` (already gitignored):
+   ```properties
+   storePassword=YOUR_STORE_PASSWORD
+   keyPassword=YOUR_KEY_PASSWORD
+   keyAlias=upload
+   storeFile=upload-keystore.jks
+   ```
+3. Build the store package:
+   ```bash
+   flutter build appbundle --release --dart-define=API_URL=https://ginata-backend.onrender.com/api/v1
+   ```
+4. Upload `frontend/build/app/outputs/bundle/release/app-release.aab` to Google Play.
 
 ---
 
@@ -209,18 +232,20 @@ No browser or mobile app should receive your database password or service-role k
 | `SMTP_STARTTLS` | `true` | Required when not using SSL. Plaintext SMTP is refused. |
 | `SMTP_USE_SSL` | `false` for port 587; `true` for port 465 | TLS from connection start on port 465. |
 | `SEED_DEMO_HOST` | `false` | Keep disabled in production. Explicit `true` is for isolated local demos/tests only. |
-| `CORS_ALLOWED_ORIGINS` | `https://ginata-estates.vercel.app` | Comma-separated exact frontend origins, no paths or wildcard. Local defaults permit loopback ports 3000 and 8080 only. |
+| `CORS_ALLOWED_ORIGINS` | `https://ginata-estates.vercel.app` | Comma-separated exact frontend origins, no paths or wildcard. Add every production web origin here. |
+| `CORS_ALLOWED_ORIGIN_REGEX` | `^https?://(localhost|127\.0\.0\.1)(:\d+)?$` | Allows local Flutter web on any loopback port. Set to an empty string to disable, or tighten for production. |
 
 Restart the backend after environment changes. All devices must use the same API:
 
 ```bash
-flutter build web --release --dart-define=API_URL=https://ginata-api.onrender.com/api/v1
-flutter build apk --release --dart-define=API_URL=https://ginata-api.onrender.com/api/v1
+flutter build web --release --dart-define=API_URL=https://ginata-backend.onrender.com/api/v1
+flutter build apk --release --dart-define=API_URL=https://ginata-backend.onrender.com/api/v1
 ```
 
 The API defaults to `https://ginata-backend.onrender.com/api/v1` if `API_URL` is not
-set. Both AuthService and ApiService share this setting. For local web development
-use a fixed permitted port (for example `flutter run -d chrome --web-port=8080`).
+set. Both AuthService and ApiService share this setting. Local Flutter web is
+allowed on loopback ports by the default CORS regex; production web origins must
+still be listed explicitly in `CORS_ALLOWED_ORIGINS`.
 
 ### Supabase database setup and upgrade precautions
 1. Back up any existing database. Set the backend connection URI, deploy this code,
@@ -279,4 +304,4 @@ free hosting/database tiers and backup guarantees should be checked before launc
 - [x] **No domain renewal fees:** Render provides `*.onrender.com` with free SSL, and Vercel provides `*.vercel.app` with free SSL.
 - [ ] **Backups:** Confirm your plan's backup coverage and test a restore before relying on it.
 - [ ] **Tax configuration:** Verify applicable taxes and registration requirements; a default zero tax rate is not a compliance guarantee.
-- [x] **Live iCal Feeds:** Your Airbnb and Booking.com iCal links sync automatically with `https://ginata-api.onrender.com/api/v1/properties/{id}/feed.ics`.
+- [x] **Live iCal Feeds:** Your Airbnb and Booking.com iCal links sync automatically with `https://ginata-backend.onrender.com/api/v1/properties/{id}/feed.ics`.

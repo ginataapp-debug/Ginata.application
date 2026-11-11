@@ -29,12 +29,30 @@ class Settings(BaseModel):
     SMTP_USE_SSL: bool = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
     SMTP_STARTTLS: bool = os.getenv("SMTP_STARTTLS", "true").lower() == "true"
     SEED_DEMO_HOST: bool = os.getenv("SEED_DEMO_HOST", "false").lower() == "true"
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI: str = os.getenv(
+        "GOOGLE_REDIRECT_URI", "https://ginata-backend.onrender.com/api/v1/integrations/google/callback"
+    )
+    GOOGLE_TOKEN_ENCRYPTION_KEY: str = os.getenv("GOOGLE_TOKEN_ENCRYPTION_KEY", "")
+    GOOGLE_OAUTH_STATE_SECRET: str = os.getenv("GOOGLE_OAUTH_STATE_SECRET", "")
+    GOOGLE_OAUTH_STATE_TTL_MINUTES: int = Field(
+        default=int(os.getenv("GOOGLE_OAUTH_STATE_TTL_MINUTES", "10")), validate_default=True, ge=1, le=30
+    )
+    GOOGLE_FORMS_POLL_SECONDS: int = Field(
+        default=int(os.getenv("GOOGLE_FORMS_POLL_SECONDS", "60")), validate_default=True, ge=0, le=3600
+    )
+    GOOGLE_FORMS_PUBSUB_TOPIC: str = os.getenv("GOOGLE_FORMS_PUBSUB_TOPIC", "")
+    GOOGLE_FORMS_PUSH_TOKEN: str = os.getenv("GOOGLE_FORMS_PUSH_TOKEN", "")
     CORS_ALLOWED_ORIGINS: list[str] = [
         origin.strip().rstrip("/")
         for origin in os.getenv(
             "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080"
         ).split(",") if origin.strip() and origin.strip() != "*"
     ]
+    CORS_ALLOWED_ORIGIN_REGEX: str = os.getenv(
+        "CORS_ALLOWED_ORIGIN_REGEX", r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+    )
 
 settings = Settings()
 

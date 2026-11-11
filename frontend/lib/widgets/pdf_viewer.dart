@@ -1,4 +1,5 @@
-import 'dart:typed_data';
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:pdfx/pdfx.dart';
@@ -20,10 +21,11 @@ Future<bool> saveDocumentToDevice(
       mimeType: mimeType,
       dialogTitle: 'Save $fileName',
     );
-    if (uri == null) return false;
+    if (uri == null && !kIsWeb) return false;
     if (context.mounted) {
+      final message = kIsWeb ? 'Download started for "$fileName".' : 'Saved "$fileName" to your device.';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved "$fileName" to your device.'), backgroundColor: GinataColors.successSage),
+        SnackBar(content: Text(message), backgroundColor: GinataColors.successSage),
       );
     }
     return true;
@@ -90,7 +92,7 @@ Future<void> openPdfViewer(
     return;
   }
   if (!context.mounted) return;
-  Navigator.of(context).push(
+  await Navigator.of(context).push(
     MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => PdfViewerScreen(title: title, fileName: fileName, bytes: data!),
@@ -117,12 +119,16 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _supported = true;
   bool _saving = false;
   Size _viewport = Size.zero;
+  bool _needsFit = true;
+  bool _fitScheduled = false;
   String? _loadError;
 
   @override
   void initState() {
     super.initState();
-    _controller = PdfControllerPinch(document: PdfDocument.openData(widget.bytes));
+    // PDF.js transfers its buffer to a worker; retain the original for downloads.
+    _controller = PdfControllerPinch(document: PdfDocument.openData(Uint8List.fromList(widget.bytes)));
+    _controller.addListener(_scheduleInitialFit);
     _checkSupport();
   }
 
@@ -147,7 +153,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     final m = _controller.value.clone();
     final scale = m.getMaxScaleOnAxis();
     if (scale == 0) return;
-    final target = (scale * factor).clamp(0.4, 12.0);
+    final target = (scale * factor).clamp(0.05, 12.0);
     final real = target / scale;
     final cx = _viewport.width / 2;
     final cy = _viewport.height / 2;
@@ -160,17 +166,31 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     setState(() {});
   }
 
-  void _fitToScreen() {
-    try {
-      final fit = _controller.calculatePageFitMatrix(pageNumber: _page);
-      if (fit != null) {
-        _controller.value = fit;
-        setState(() {});
-        return;
-      }
-    } catch (_) {}
-    _controller.value = Matrix4.identity();
-    setState(() {});
+  void _scheduleInitialFit() {
+    if (!_needsFit || _fitScheduled || !mounted) return;
+    _fitScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fitScheduled = false;
+      if (mounted) _fitToScreen();
+    });
+  }
+
+  void _fitToScreen({int? page}) {
+    final targetPage = page ?? _page;
+    if (_viewport.isEmpty || (_controller.pagesCount ?? 0) < targetPage) return;
+    final rect = _controller.getPageRect(targetPage)?.inflate(14);
+    if (rect == null || rect.isEmpty) return;
+    final scale = math.min(_viewport.width / rect.width, _viewport.height / rect.height);
+    _needsFit = false;
+    _controller.value = Matrix4.identity()
+      ..translateByDouble(
+        _viewport.width / 2 - rect.center.dx * scale,
+        _viewport.height / 2 - rect.center.dy * scale,
+        0,
+        1,
+      )
+      ..scaleByDouble(scale, scale, 1, 1);
+    setState(() => _page = targetPage);
   }
 
   Future<void> _download() async {
@@ -187,10 +207,12 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       appBar: AppBar(
         backgroundColor: GinataColors.primary,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+            Text(widget.title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
             Text(widget.fileName, style: const TextStyle(fontSize: 10, color: Colors.white70), overflow: TextOverflow.ellipsis),
           ],
         ),
@@ -202,7 +224,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                 : const Icon(Icons.download_rounded),
             onPressed: _saving ? null : _download,
           ),
-          IconButton(tooltip: 'Close', icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
           const SizedBox(width: 4),
         ],
       ),
@@ -215,16 +236,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                     Expanded(
                       child: LayoutBuilder(
                         builder: (ctx, constraints) {
-                          _viewport = Size(constraints.maxWidth, constraints.maxHeight);
+                          final viewport = Size(constraints.maxWidth, constraints.maxHeight);
+                          if (_viewport != viewport) {
+                            _viewport = viewport;
+                            _needsFit = true;
+                            _scheduleInitialFit();
+                          }
                           if (_loadError != null) {
                             return _buildError();
                           }
                           return PdfViewPinch(
                             controller: _controller,
                             padding: 14,
-                            minScale: 0.4,
+                            minScale: 0.05,
                             maxScale: 12.0,
                             backgroundDecoration: const BoxDecoration(color: Color(0xFFE9EDF2)),
+                            onInteractionEnd: (_) => setState(() {}),
                             onPageChanged: (p) => setState(() => _page = p),
                             onDocumentLoaded: (doc) => setState(() => _pages = doc.pagesCount),
                             onDocumentError: (e) => setState(() => _loadError = e.toString()),
@@ -244,35 +271,47 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: SafeArea(
         top: false,
-        child: Row(
-          children: [
-            IconButton(
-              tooltip: 'Previous page',
-              icon: const Icon(Icons.chevron_left, color: Colors.white),
-              onPressed: _page > 1 ? () => _controller.previousPage(duration: const Duration(milliseconds: 280), curve: Curves.easeOut) : null,
-            ),
-            Expanded(
-              child: Text(
-                _pages > 0 ? 'Page $_page / $_pages' : 'Page $_page',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                overflow: TextOverflow.ellipsis,
+        child: SizedBox(
+          width: double.infinity,
+          child: Wrap(
+            alignment: WrapAlignment.spaceEvenly,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Previous page',
+                    icon: const Icon(Icons.chevron_left, color: Colors.white),
+                    onPressed: _page > 1 ? () => _fitToScreen(page: _page - 1) : null,
+                  ),
+                  Text(
+                    _pages > 0 ? 'Page $_page / $_pages' : 'Page $_page',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  IconButton(
+                    tooltip: 'Next page',
+                    icon: const Icon(Icons.chevron_right, color: Colors.white),
+                    onPressed: _page < _pages ? () => _fitToScreen(page: _page + 1) : null,
+                  ),
+                ],
               ),
-            ),
-            IconButton(
-              tooltip: 'Next page',
-              icon: const Icon(Icons.chevron_right, color: Colors.white),
-              onPressed: (_pages == 0 || _page < _pages) ? () => _controller.nextPage(duration: const Duration(milliseconds: 280), curve: Curves.easeOut) : null,
-            ),
-            Container(width: 1, height: 24, color: Colors.white24),
-            IconButton(tooltip: 'Zoom out', icon: const Icon(Icons.zoom_out, color: Colors.white, size: 20), onPressed: () => _zoomBy(1 / 1.25)),
-            SizedBox(
-              width: 48,
-              child: Text('$zoomPct%', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
-            ),
-            IconButton(tooltip: 'Zoom in', icon: const Icon(Icons.zoom_in, color: Colors.white, size: 20), onPressed: () => _zoomBy(1.25)),
-            IconButton(tooltip: 'Fit to screen', icon: const Icon(Icons.fit_screen, color: Colors.white, size: 20), onPressed: _fitToScreen),
-          ],
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(tooltip: 'Zoom out', icon: const Icon(Icons.zoom_out, color: Colors.white, size: 20), onPressed: () => _zoomBy(1 / 1.25)),
+                  SizedBox(
+                    width: 48,
+                    child: Text('$zoomPct%', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ),
+                  IconButton(tooltip: 'Zoom in', icon: const Icon(Icons.zoom_in, color: Colors.white, size: 20), onPressed: () => _zoomBy(1.25)),
+                  IconButton(tooltip: 'Fit to screen', icon: const Icon(Icons.fit_screen, color: Colors.white, size: 20), onPressed: _fitToScreen),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

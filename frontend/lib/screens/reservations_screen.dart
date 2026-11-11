@@ -442,18 +442,27 @@ class ReservationDetailsPage extends StatefulWidget {
 }
 
 class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
+  late Map<String, dynamic> _reservation;
   Map<String, dynamic>? _timelineData;
   bool _isLoadingTimeline = true;
 
   @override
   void initState() {
     super.initState();
+    _reservation = Map<String, dynamic>.from(widget.reservation);
     _loadTimeline();
   }
 
+  Future<void> _refreshReservation() async {
+    final updated = await ApiService.fetchReservation(_reservation['id'].toString());
+    if (!mounted || updated == null || updated.isEmpty) return;
+    setState(() => _reservation = updated);
+  }
+
   Future<void> _loadTimeline() async {
-    final resId = widget.reservation['id'].toString();
+    final resId = _reservation['id'].toString();
     final timeline = await ApiService.fetchFinancialTimeline(resId);
+    if (!mounted) return;
     setState(() {
       _timelineData = timeline;
       _isLoadingTimeline = false;
@@ -461,12 +470,12 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
   }
 
   void _recordPayment() async {
-    final res = widget.reservation;
+    final res = _reservation;
     final resId = res['id'].toString();
     final guest = res['primary_guest'] ?? {};
     final guestName = '${guest['first_name'] ?? ''} ${guest['last_name'] ?? ''}'.trim();
 
-    final result = await showDialog<bool>(
+    await showDialog<bool>(
       context: context,
       builder: (_) => PaymentModal(
         reservationId: resId,
@@ -477,14 +486,13 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
         guestName: guestName.isEmpty ? null : guestName,
       ),
     );
-    if (result == true) {
-      widget.onRefresh();
-      _loadTimeline();
-    }
+    if (!mounted) return;
+    widget.onRefresh();
+    await Future.wait([_refreshReservation(), _loadTimeline()]);
   }
 
   void _shareGuestForm() async {
-    final resId = widget.reservation['id'].toString();
+    final resId = _reservation['id'].toString();
     try {
       final form = await ApiService.generateGuestForm(resId);
       final token = form['token'];
@@ -527,7 +535,7 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
     final updated = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => ManualBookingDialog(initialData: widget.reservation),
+      builder: (_) => ManualBookingDialog(initialData: _reservation),
     );
     if (updated == true) {
       widget.onRefresh();
@@ -536,7 +544,7 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
   }
 
   void _cancelBooking() async {
-    final resId = widget.reservation['id'].toString();
+    final resId = _reservation['id'].toString();
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -565,7 +573,7 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final res = widget.reservation;
+    final res = _reservation;
     final guest = res['primary_guest'] ?? {};
     final guestName = '${guest['first_name'] ?? ''} ${guest['last_name'] ?? ''}'.trim();
     final prop = res['property'] ?? {};
@@ -638,7 +646,7 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
                 onPressed: () async {
                   final messenger = ScaffoldMessenger.of(context);
                   final navigator = Navigator.of(context);
-                  final resId = widget.reservation['id'].toString();
+                  final resId = _reservation['id'].toString();
                   try {
                     final inv = await ApiService.createInvoice(resId, {'document_type': 'invoice'});
                     messenger.showSnackBar(

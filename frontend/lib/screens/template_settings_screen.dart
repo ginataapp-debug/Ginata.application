@@ -413,7 +413,7 @@ class _TemplateSettingsScreenState extends State<TemplateSettingsScreen> {
                 ),
                 alignment: Alignment.center,
                 child: Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/brand_lockup.png',
                   errorBuilder: (context, error, stack) => const Text(
                     'Ginata',
                     style: TextStyle(

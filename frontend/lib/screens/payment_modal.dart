@@ -52,7 +52,7 @@ class _PaymentModalState extends State<PaymentModal> {
     super.initState();
     final owed = _outstanding;
     _amountCtrl = TextEditingController(
-      text: owed > 0 ? owed.toStringAsFixed(0) : (widget.suggestedAmount > 0 ? widget.suggestedAmount.toStringAsFixed(0) : ''),
+      text: owed > 0 ? owed.toStringAsFixed(2) : (widget.suggestedAmount > 0 ? widget.suggestedAmount.toStringAsFixed(2) : ''),
     );
     _payMode = owed > 0 ? 'full' : 'custom';
   }
@@ -62,11 +62,19 @@ class _PaymentModalState extends State<PaymentModal> {
       _payMode = mode;
       final owed = _outstanding;
       if (mode == 'full') {
-        _amountCtrl.text = owed.toStringAsFixed(0);
+        _amountCtrl.text = owed.toStringAsFixed(2);
       } else if (mode == 'half') {
-        _amountCtrl.text = (owed / 2).toStringAsFixed(0);
+        _amountCtrl.text = (owed / 2).toStringAsFixed(2);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _txRefCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _submitPayment() async {
@@ -82,7 +90,7 @@ class _PaymentModalState extends State<PaymentModal> {
         'payment_method': _paymentMethod,
         'transaction_reference': _txRefCtrl.text.trim().isNotEmpty ? _txRefCtrl.text.trim() : null,
         'is_verified': _isVerified,
-        'verification_source': _isVerified ? 'mpesa_c2b' : 'manual',
+        'verification_source': 'manual',
         'notes': _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       };
 
@@ -91,6 +99,7 @@ class _PaymentModalState extends State<PaymentModal> {
           ? Map<String, dynamic>.from(payment['receipt'] as Map)
           : (payment['receipt_number'] != null ? Map<String, dynamic>.from(payment) : null);
 
+      if (!mounted) return;
       setState(() {
         _generatedReceipt = receipt;
         _isSubmitting = false;
@@ -208,6 +217,7 @@ class _PaymentModalState extends State<PaymentModal> {
                   // Payment Method
                   DropdownButtonFormField<String>(
                     initialValue: _paymentMethod,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Payment Method *'),
                     items: const [
                       DropdownMenuItem(value: 'mpesa', child: Text('M-Pesa (Till / Paybill)')),
@@ -234,7 +244,7 @@ class _PaymentModalState extends State<PaymentModal> {
                           children: [
                             const Icon(Icons.confirmation_number_outlined, size: 16, color: GinataColors.primary),
                             const SizedBox(width: 6),
-                            const Text('Transaction reference code', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GinataColors.primary)),
+                            const Expanded(child: Text('Transaction reference code', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GinataColors.primary))),
                           ],
                         ),
                         const SizedBox(height: 4),
@@ -259,8 +269,8 @@ class _PaymentModalState extends State<PaymentModal> {
                   // Verification Toggle
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Verified by Payment Provider', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                    subtitle: const Text('Distinguishes manually entered cash from gateway confirmed payouts.', style: TextStyle(fontSize: 11)),
+                    title: const Text('Payment checked by host', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Confirm you checked the funds received. This is a manual check, not provider verification.', style: TextStyle(fontSize: 11)),
                     value: _isVerified,
                     activeThumbColor: GinataColors.primary,
                     onChanged: (v) => setState(() => _isVerified = v),

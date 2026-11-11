@@ -1398,7 +1398,7 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Image.asset('assets/images/logo.png', height: 42, errorBuilder: (context, error, stackTrace) => const Icon(Icons.villa, color: GinataColors.primary, size: 36)),
+                                Image.asset('assets/images/brand_lockup.png', height: 42, errorBuilder: (context, error, stackTrace) => const Icon(Icons.villa, color: GinataColors.primary, size: 36)),
                                 const SizedBox(height: 6),
                                 Text(_orgProfile?['name']?.isNotEmpty == true ? _orgProfile!['name'] : 'Ginata Host', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: GinataColors.primary)),
                                 Text('${_orgProfile?['city'] ?? "Nairobi, Kenya"}${_orgProfile?["email"]?.isNotEmpty == true ? " • ${_orgProfile!["email"]}" : ""}', style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
@@ -1514,7 +1514,7 @@ class _InvoiceStudioScreenState extends State<InvoiceStudioScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.asset('assets/images/logo.png', height: 40, errorBuilder: (context, error, stackTrace) => const Icon(Icons.villa, color: GinataColors.primary, size: 36)),
+                  Image.asset('assets/images/brand_lockup.png', height: 40, errorBuilder: (context, error, stackTrace) => const Icon(Icons.villa, color: GinataColors.primary, size: 36)),
                   const SizedBox(height: 6),
                   Text(inv['supplier_name'] ?? (_orgProfile?['name']?.isNotEmpty == true ? _orgProfile!['name'] : 'Ginata Host'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: GinataColors.primary)),
                   Text(inv['supplier_address'] ?? (_orgProfile?['address']?.isNotEmpty == true ? _orgProfile!['address'] : 'Nairobi, Kenya'), style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary)),

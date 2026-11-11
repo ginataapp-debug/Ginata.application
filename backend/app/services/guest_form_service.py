@@ -12,6 +12,7 @@ from backend.app.schemas.schemas import (
     PublicGuestFormView, PublicGuestFormSubmitRequest, SubmissionReviewRequest
 )
 from backend.app.services.audit_service import log_audit_event
+from backend.app.services.google_forms_sync_service import notify_guest_check_in
 
 def get_or_generate_reservation_form_token(
     db: Session,
@@ -215,6 +216,12 @@ def submit_public_guest_form(
     reservation.guest_info_status = "needs_review" if needs_review else "completed"
 
     # 7. Record in audit log
+    notify_guest_check_in(
+        db, submission.organization_id, submission.guest_name,
+        reservation.property.name if reservation.property else None,
+        reservation.check_in_date, submission.submitted_at,
+        "guest_form_submission", submission.id, f"hosted-submission:{submission.id}",
+    )
     log_audit_event(
         db=db,
         organization_id=submission.organization_id,

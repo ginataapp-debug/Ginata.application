@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_service.dart';
+
+enum SessionValidation { valid, invalid, unavailable }
 
 class AuthService {
   static String get _baseUrl => ApiService.baseUrl;
@@ -51,9 +54,9 @@ class AuthService {
                 'organization_name': organizationName.trim(),
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 45));
 
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final body = _decodeBody(response);
       if (response.statusCode == 201) {
         if (body['verification_required'] == true) {
           // No token is issued or persisted until the server accepts the code.
@@ -61,12 +64,9 @@ class AuthService {
         }
         return await _acceptSession(body);
       }
-      return _errorResponse(body, 'Registration failed. Please try again.');
-    } catch (e) {
-      return {
-        'success': false,
-        'message': 'Cannot reach the Ginata server. Account creation needs an internet connection so your credentials are stored securely. Check your connection and try again.',
-      };
+      return _responseError(response, 'Registration failed. Please try again.');
+    } catch (error) {
+      return _requestFailure('create your account', error);
     }
   }
 
@@ -86,19 +86,44 @@ class AuthService {
               'password': password,
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 45));
 
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final body = _decodeBody(response);
       if (response.statusCode == 200) {
         return await _acceptSession(body);
       }
-      return _errorResponse(body, 'Invalid email or password.');
-    } catch (_) {
-      return {
-        'success': false,
-        'message': 'Cannot reach the Ginata server. Sign-in must be verified online to keep your account secure. Check your connection and try again.',
-      };
+      return _responseError(response, 'Invalid email or password.');
+    } catch (error) {
+      return _requestFailure('sign in', error);
     }
+  }
+
+  static Map<String, dynamic> _decodeBody(http.Response response) {
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map) return Map<String, dynamic>.from(body);
+    } catch (_) {}
+    return {};
+  }
+
+  static Map<String, dynamic> _requestFailure(String action, Object error) {
+    final message = switch (error) {
+      TimeoutException() => 'The Ginata server took too long to respond. It may be waking up. Check your connection and try again.',
+      http.ClientException() => 'Could not connect to Ginata. Check your internet connection. If you are using the web app, its site address must be allowed by the server.',
+      _ => 'Could not $action. Check your connection and try again.',
+    };
+    return {'success': false, 'message': message};
+  }
+
+  static Map<String, dynamic> _responseError(http.Response response, String fallback) {
+    final body = _decodeBody(response);
+    if (body.isEmpty) {
+      final message = response.statusCode >= 500
+          ? 'The Ginata server is temporarily unavailable (HTTP ${response.statusCode}). Please try again shortly.'
+          : '$fallback (HTTP ${response.statusCode})';
+      return {'success': false, 'message': message};
+    }
+    return _errorResponse(body, fallback);
   }
 
   static Map<String, dynamic> _errorResponse(Map<String, dynamic> body, String fallback) {
@@ -109,6 +134,12 @@ class AuthService {
         'message': detail['message']?.toString() ?? fallback,
         'verification_required': detail['verification_required'] == true,
       };
+    }
+    if (detail is List && detail.isNotEmpty) {
+      final first = detail.first;
+      if (first is Map && first['msg'] != null) {
+        return {'success': false, 'message': first['msg'].toString()};
+      }
     }
     return {'success': false, 'message': detail is String ? detail : fallback};
   }
@@ -138,12 +169,12 @@ class AuthService {
         Uri.parse('$_baseUrl/auth/verification/send'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email.trim().toLowerCase(), 'password': password}),
-      ).timeout(const Duration(seconds: 30));
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      ).timeout(const Duration(seconds: 45));
+      final body = _decodeBody(response);
       if (response.statusCode == 200) return body;
-      return _errorResponse(body, 'Could not send a confirmation code.');
-    } catch (_) {
-      return {'success': false, 'message': 'Could not reach the server to send a confirmation code.'};
+      return _responseError(response, 'Could not send a confirmation code.');
+    } catch (error) {
+      return _requestFailure('send a confirmation code', error);
     }
   }
 
@@ -153,22 +184,21 @@ class AuthService {
         Uri.parse('$_baseUrl/auth/verification/verify'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email.trim().toLowerCase(), 'code': code}),
-      ).timeout(const Duration(seconds: 30));
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      ).timeout(const Duration(seconds: 45));
+      final body = _decodeBody(response);
       if (response.statusCode == 200) return await _acceptSession(body);
-      return _errorResponse(body, 'Could not confirm your email.');
-    } catch (_) {
-      return {'success': false, 'message': 'Could not reach the server to confirm your email.'};
+      return _responseError(response, 'Could not confirm your email.');
+    } catch (error) {
+      return _requestFailure('confirm your email', error);
     }
   }
 
-  /// Requires online validation; no fallback sign-in when validation fails.
-  static Future<bool> validateSession() async {
+  static Future<SessionValidation> validateSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = await getToken();
     if (token.isEmpty || token.startsWith('local-') || token == 'offline-token') {
       await logout();
-      return false;
+      return SessionValidation.invalid;
     }
     try {
       final response = await http.get(
@@ -177,10 +207,14 @@ class AuthService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
-        final host = jsonDecode(response.body) as Map<String, dynamic>;
+        final host = _decodeBody(response);
+        if (host['id'] is! String || host['email'] is! String ||
+            host['organization_id'] is! String || host['is_active'] != true) {
+          return SessionValidation.unavailable;
+        }
         await _saveSession(
           email: host['email'] ?? '',
           name: host['full_name'] ?? 'Host',
@@ -190,15 +224,15 @@ class AuthService {
           lastLoginAt: host['last_login_at']?.toString(),
           isVerified: host['is_verified'] == true,
         );
-        return true;
+        return SessionValidation.valid;
       }
       if (response.statusCode == 401 || response.statusCode == 403) {
         await logout();
-        return false;
+        return SessionValidation.invalid;
       }
-      return false;
+      return SessionValidation.unavailable;
     } catch (_) {
-      return false;
+      return SessionValidation.unavailable;
     }
   }
 
@@ -330,7 +364,7 @@ class AuthService {
           if (email != null) 'email': email.trim(),
         }),
       ).timeout(const Duration(seconds: 15));
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final body = _decodeBody(response);
       if (response.statusCode == 200) {
         final prefs = await SharedPreferences.getInstance();
         await Future.wait([
@@ -343,8 +377,8 @@ class AuthService {
         return {'success': true, 'host': body};
       }
       return {'success': false, 'message': body['detail'] ?? 'Could not update profile.'};
-    } catch (_) {
-      return {'success': false, 'message': 'Cannot reach the server. Profile changes need a connection.'};
+    } catch (error) {
+      return _requestFailure('update your profile', error);
     }
   }
 

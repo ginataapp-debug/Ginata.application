@@ -292,9 +292,38 @@ class GuestFormResponse(OrmModel):
     created_at: datetime
 
 class GoogleFormsConfigRequest(BaseModel):
-    google_form_id: Optional[str] = None
-    google_sheet_id: Optional[str] = None
-    google_connected_email: Optional[str] = None
+    form: str = Field(..., min_length=1, max_length=500, description="Google Form edit link or form ID")
+    property_id: Optional[str] = None
+
+class GoogleFormResponseOut(OrmModel):
+    id: str
+    google_response_id: str
+    reservation_id: Optional[str] = None
+    match_status: str
+    sync_status: str
+    match_reason: Optional[str] = None
+    guest_name: Optional[str] = None
+    guest_email: Optional[str] = None
+    guest_phone: Optional[str] = None
+    booking_reference: Optional[str] = None
+    check_in_date: Optional[date] = None
+    answers: Optional[List[Dict[str, Any]]] = None
+    submitted_at: Optional[datetime] = None
+    last_error: Optional[str] = None
+    created_at: datetime
+
+class GoogleFormAssignRequest(BaseModel):
+    reservation_id: str = Field(..., min_length=1, max_length=36)
+
+class HostNotificationOut(OrmModel):
+    id: str
+    kind: str
+    title: str
+    body: Optional[str] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[str] = None
+    read_at: Optional[datetime] = None
+    created_at: datetime
 
 class PublicGuestFormView(BaseModel):
     token: str

@@ -5,58 +5,40 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Ginata - Premium Property Management Platform for Luxury Estates & Stays.">
+  <meta name="description" content="Ginata - Property management for hosts, stays, finances, and guest documents.">
+  <meta name="theme-color" content="#003329">
 
-  <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Ginata">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Ginata</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    body {
-      margin: 0;
-      background-color: #003329;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    }
+    html, body { margin: 0; height: 100%; background: #f7f5f0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .splash-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: linear-gradient(180deg, #fbf8f1, #f3f6f1);
     }
-    .splash-logo {
-      width: 140px;
-      height: auto;
-      margin-bottom: 24px;
-    }
-    .splash-spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid rgba(253, 249, 242, 0.2);
-      border-radius: 50%;
-      border-top-color: #FDF9F2;
-      animation: spin 1s ease-in-out infinite;
-    }
-    .splash-text {
-      margin-top: 16px;
-      color: #FDF9F2;
-      font-size: 13px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      font-weight: 600;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .brand-tree { position: relative; width: 150px; height: 167px; }
+    .brand-tree img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; }
+    .tree-trunk { animation: trunk-in .7s cubic-bezier(.2,.8,.2,1) forwards; }
+    .tree-left { animation: left-in .8s .12s cubic-bezier(.2,.8,.2,1) forwards; }
+    .tree-right { animation: right-in .8s .22s cubic-bezier(.2,.8,.2,1) forwards; }
+    .tree-top { animation: top-in .8s .32s cubic-bezier(.2,.8,.2,1) forwards; }
+    .brand-word { width: 190px; margin-top: 20px; opacity: 0; animation: word-in .6s .75s ease-out forwards; }
+    .splash-text { margin-top: 10px; color: #466557; font-size: 10px; letter-spacing: 3px; font-weight: 600; opacity: 0; animation: word-in .6s .9s ease-out forwards; }
+    @keyframes trunk-in { from { opacity: 0; transform: translateY(34px) scale(.9); } to { opacity: 1; transform: none; } }
+    @keyframes left-in { from { opacity: 0; transform: translate(-34px,12px) rotate(-6deg) scale(.9); } to { opacity: 1; transform: none; } }
+    @keyframes right-in { from { opacity: 0; transform: translate(34px,12px) rotate(6deg) scale(.9); } to { opacity: 1; transform: none; } }
+    @keyframes top-in { from { opacity: 0; transform: translateY(-30px) scale(.86); } to { opacity: 1; transform: none; } }
+    @keyframes word-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .brand-tree img, .brand-word, .splash-text { animation: none; opacity: 1; }
     }
   </style>
 </head>
@@ -71,11 +53,26 @@
     cMapPacked: true,
   }
   </script>
-  <div class="splash-container" id="splash">
-    <img src="favicon.png" alt="Ginata Logo" class="splash-logo" />
-    <div class="splash-spinner"></div>
-    <div class="splash-text">Ginata Luxury Estates</div>
+  <div class="splash-container" id="splash" aria-label="Loading Ginata">
+    <div class="brand-tree" aria-hidden="true">
+      <img src="assets/assets/images/tree_trunk.png" class="tree-trunk" alt="">
+      <img src="assets/assets/images/tree_left.png" class="tree-left" alt="">
+      <img src="assets/assets/images/tree_right.png" class="tree-right" alt="">
+      <img src="assets/assets/images/tree_top.png" class="tree-top" alt="">
+    </div>
+    <img src="assets/assets/images/wordmark.png" class="brand-word" alt="Ginata">
+    <div class="splash-text">PROPERTY MANAGEMENT</div>
   </div>
+  <script>
+    const splash = document.getElementById('splash');
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('flutter-view')) {
+        splash.remove();
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

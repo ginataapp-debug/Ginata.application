@@ -10,227 +10,163 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
-  late final AnimationController _logoController;
-  late final Animation<double> _logoScale;
-  late final Animation<double> _logoFade;
-
-  late final AnimationController _titleController;
-  late final Animation<double> _titleFade;
-
-  late final AnimationController _subtitleController;
-  late final Animation<double> _subtitleFade;
-
-  late final AnimationController _indicatorController;
-  late final Animation<double> _indicatorFade;
-
-  late final AnimationController _pulseController;
-  late final Animation<double> _pulse;
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  bool _started = false;
 
   @override
   void initState() {
     super.initState();
-
-    _logoController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack),
-    );
-    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.easeOut),
-    );
-
-    _titleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _titleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _titleController, curve: Curves.easeOut),
-    );
-
-    _subtitleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _subtitleFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _subtitleController, curve: Curves.easeOut),
-    );
-
-    _indicatorController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _indicatorFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _indicatorController, curve: Curves.easeOut),
-    );
-
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _pulse = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-
-    _startAnimations();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
+    _controller.addListener(() {
+      if (mounted) setState(() {});
+    });
+    _controller.addStatusListener((status) async {
+      if (status != AnimationStatus.completed) return;
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      if (mounted) widget.onComplete();
+    });
   }
 
-  Future<void> _startAnimations() async {
-    _logoController.forward();
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    _titleController.forward();
-
-    await Future.delayed(const Duration(milliseconds: 200));
-    if (!mounted) return;
-    _subtitleController.forward();
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
-    _indicatorController.forward();
-    _pulseController.repeat(reverse: true);
-
-    await Future.delayed(const Duration(milliseconds: 1700));
-    if (!mounted) return;
-    widget.onComplete();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (MediaQuery.of(context).disableAnimations) {
+      _controller.value = 1;
+    } else {
+      _controller.forward();
+    }
   }
 
   @override
   void dispose() {
-    _logoController.dispose();
-    _titleController.dispose();
-    _subtitleController.dispose();
-    _indicatorController.dispose();
-    _pulseController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: GinataColors.background,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const Spacer(flex: 3),
-            AnimatedBuilder(
-              animation: _logoController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _logoFade.value,
-                  child: Transform.scale(
-                    scale: _logoScale.value,
-                    child: child,
-                  ),
-                );
-              },
-              child: Image.asset(
-                'assets/images/logo.png',
-                height: 100,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 100,
-                    width: 100,
-                    decoration: BoxDecoration(
-                      color: GinataColors.primary,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'G',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 32),
-            FadeTransition(
-              opacity: _titleFade,
-              child: const Text(
-                'GINATA',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w700,
-                  color: GinataColors.primary,
-                  letterSpacing: 12,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            FadeTransition(
-              opacity: _subtitleFade,
-              child: Text(
-                'Property Management',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                  color: GinataColors.secondary.withValues(alpha: 0.8),
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
-            const Spacer(flex: 3),
-            FadeTransition(
-              opacity: _indicatorFade,
-              child: AnimatedBuilder(
-                animation: _pulse,
-                builder: (context, child) {
-                  return _PulsingDots(
-                    color: GinataColors.secondary,
-                    progress: _pulse.value,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 48),
-          ],
+  double _progress(double start, double end, [Curve curve = Curves.easeOutCubic]) {
+    return Interval(start, end, curve: curve).transform(_controller.value);
+  }
+
+  Widget _treePiece(String asset, double start, double end, Offset from, {double rotation = 0}) {
+    final t = _progress(start, end, Curves.easeOutBack);
+    return Opacity(
+      opacity: _progress(start, (start + end) / 2).clamp(0.0, 1.0),
+      child: Transform.translate(
+        offset: Offset(from.dx * (1 - t), from.dy * (1 - t)),
+        child: Transform.rotate(
+          angle: rotation * (1 - t),
+          child: Transform.scale(
+            scale: 0.86 + 0.14 * t,
+            child: Image.asset(asset, fit: BoxFit.contain, excludeFromSemantics: true),
+          ),
         ),
       ),
     );
   }
-}
-
-class _PulsingDots extends StatelessWidget {
-  final Color color;
-  final double progress;
-
-  const _PulsingDots({required this.color, required this.progress});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(3, (index) {
-        final offset = index * 0.2;
-        final dotProgress = ((progress + offset) % 1.0);
-        final scale = 0.5 + (dotProgress * 0.5);
-        final opacity = 0.3 + (dotProgress * 0.7);
+    final width = MediaQuery.sizeOf(context).width;
+    final treeWidth = width < 380 ? 176.0 : 216.0;
+    final treeHeight = treeWidth * 830 / 745;
+    final wordWidth = width < 380 ? 210.0 : 252.0;
+    final wordOpacity = _progress(0.62, 0.86);
+    final subtitleOpacity = _progress(0.74, 0.94);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Transform.scale(
-            scale: scale,
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: opacity),
-                shape: BoxShape.circle,
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFBF8F1), Color(0xFFF3F6F1)],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: treeWidth,
+                      height: treeHeight,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          _treePiece('assets/images/tree_trunk.png', 0.00, 0.46, const Offset(0, 70)),
+                          _treePiece('assets/images/tree_left.png', 0.12, 0.58, const Offset(-70, 24), rotation: -0.10),
+                          _treePiece('assets/images/tree_right.png', 0.20, 0.66, const Offset(70, 24), rotation: 0.10),
+                          _treePiece('assets/images/tree_top.png', 0.30, 0.76, const Offset(0, -64)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 26),
+                    Opacity(
+                      opacity: wordOpacity,
+                      child: Transform.translate(
+                        offset: Offset(0, 14 * (1 - wordOpacity)),
+                        child: Image.asset(
+                          'assets/images/wordmark.png',
+                          width: wordWidth,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'Ginata',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Opacity(
+                      opacity: subtitleOpacity,
+                      child: const Text(
+                        'PROPERTY MANAGEMENT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 3.2,
+                          color: GinataColors.secondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 44),
+                    Opacity(
+                      opacity: subtitleOpacity,
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: 72,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(
+                                value: _progress(0.78, 1.0),
+                                minHeight: 3,
+                                backgroundColor: GinataColors.secondary.withValues(alpha: 0.14),
+                                valueColor: const AlwaysStoppedAnimation<Color>(GinataColors.primary),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Preparing your workspace',
+                            style: TextStyle(fontSize: 12, color: GinataColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        );
-      }),
+        ),
+      ),
     );
   }
 }

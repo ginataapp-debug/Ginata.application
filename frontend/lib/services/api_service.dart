@@ -1,8 +1,26 @@
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+
+class ServerConnection {
+  final bool isOnline;
+  final String message;
+
+  const ServerConnection({required this.isOnline, required this.message});
+}
+
+class ApiException implements Exception {
+  final int statusCode;
+  final String message;
+
+  const ApiException(this.statusCode, this.message);
+
+  @override
+  String toString() => message;
+}
 
 class ApiService {
   static const String baseUrl = String.fromEnvironment(
@@ -13,7 +31,36 @@ class ApiService {
   static String orgId = 'org-ginata-prime';
   static String? authToken;
   static String hostName = 'Host';
-  static const Duration _timeout = Duration(seconds: 10);
+  static const Duration _timeout = Duration(seconds: 20);
+
+  static Future<ServerConnection> checkServerConnection() async {
+    try {
+      final apiUri = Uri.parse(baseUrl);
+      final response = await http.get(apiUri.replace(path: '/')).timeout(const Duration(seconds: 30));
+      if (response.statusCode == 200) {
+        return const ServerConnection(isOnline: true, message: 'Connected to Ginata.');
+      }
+      return ServerConnection(
+        isOnline: false,
+        message: 'The Ginata server responded with HTTP ${response.statusCode}. Please try again shortly.',
+      );
+    } on TimeoutException {
+      return const ServerConnection(
+        isOnline: false,
+        message: 'The server is taking too long to respond. It may be waking up; please retry.',
+      );
+    } on http.ClientException {
+      return const ServerConnection(
+        isOnline: false,
+        message: 'No connection to Ginata. Check your internet connection. Web hosting also requires this site to be added to CORS_ALLOWED_ORIGINS on the server.',
+      );
+    } catch (_) {
+      return const ServerConnection(
+        isOnline: false,
+        message: 'The server connection could not be verified. Check your connection and retry.',
+      );
+    }
+  }
 
   static Map<String, String> get _headers => {
     'Content-Type': 'application/json',
@@ -1019,35 +1066,89 @@ class ApiService {
     } catch (_) {}
   }
 
-  static Future<Map<String, dynamic>> fetchGoogleFormsStatus() async {
+  static Future<dynamic> _send(String method, String path, {Object? body, Map<String, String>? query}) async {
+    final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
+    final http.Response res;
     try {
-      final res = await http.get(Uri.parse('$baseUrl/guest-forms/google/status'), headers: _headers).timeout(_timeout);
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
-      }
+      final req = http.Request(method, uri)..headers.addAll(_headers);
+      if (body != null) req.body = jsonEncode(body);
+      res = await http.Response.fromStream(await req.send().timeout(_timeout));
+    } on TimeoutException {
+      throw const ApiException(0, 'The Ginata server took too long to respond. Please try again.');
+    } catch (_) {
+      throw const ApiException(0, 'Could not reach the Ginata server. Check your connection and try again.');
+    }
+    if (res.statusCode >= 200 && res.statusCode < 300) {
+      return res.body.isEmpty ? null : jsonDecode(res.body);
+    }
+    String message = 'Request failed (HTTP ${res.statusCode}).';
+    try {
+      final detail = (jsonDecode(res.body) as Map)['detail'];
+      if (detail is String && detail.isNotEmpty) message = detail;
     } catch (_) {}
-    return {
-      'mode': 'google_forms',
-      'is_connected': true,
-      'connected_email': _localOrganization['email'] ?? 'host@ginata.ke',
-      'google_form_id': 'Ready to link your Google Form',
-      'google_sheet_id': 'Ready to link Google Sheet',
-      'sync_status': 'ready',
-    };
+    if (res.statusCode == 404 && message == 'Not Found') {
+      message = 'This feature is not available on the server yet. Please update the Ginata backend.';
+    }
+    throw ApiException(res.statusCode, message);
   }
 
-  static Future<Map<String, dynamic>> syncGoogleForms() async {
-    try {
-      final res = await http.post(Uri.parse('$baseUrl/guest-forms/google/sync'), headers: _headers).timeout(_timeout);
-      if (res.statusCode == 200) {
-        return jsonDecode(res.body) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-    return {
-      'synced': true,
-      'imported_submissions': 0,
-      'message': 'Google Forms check-in responses synchronized.',
-    };
+  static Future<Map<String, dynamic>> fetchGoogleAccountStatus() async =>
+      Map<String, dynamic>.from(await _send('GET', '/integrations/google/status') as Map);
+
+  static Future<String> getGoogleAuthorizationUrl() async {
+    final data = await _send('GET', '/integrations/google/authorize') as Map;
+    return data['authorization_url'] as String;
+  }
+
+  static Future<void> disconnectGoogleAccount() async {
+    await _send('DELETE', '/integrations/google/connection');
+  }
+
+  static Future<Map<String, dynamic>> fetchGoogleFormsStatus() async =>
+      Map<String, dynamic>.from(await _send('GET', '/guest-forms/google/status') as Map);
+
+  static Future<Map<String, dynamic>> linkGoogleForm(String form, {String? propertyId}) async =>
+      Map<String, dynamic>.from(await _send('PUT', '/guest-forms/google/config', body: {
+        'form': form,
+        'property_id': ?propertyId,
+      }) as Map);
+
+  static Future<void> unlinkGoogleForm() async {
+    await _send('DELETE', '/guest-forms/google/config');
+  }
+
+  static Future<Map<String, dynamic>> syncGoogleForms() async =>
+      Map<String, dynamic>.from(await _send('POST', '/guest-forms/google/sync') as Map);
+
+  static Future<List<dynamic>> fetchGoogleFormResponses({String? syncStatus, String? matchStatus, int limit = 100}) async =>
+      await _send('GET', '/guest-forms/google/responses', query: {
+        'sync_status': ?syncStatus,
+        'match_status': ?matchStatus,
+        'limit': '$limit',
+      }) as List<dynamic>;
+
+  static Future<Map<String, dynamic>> fetchGoogleFormResponse(String responseId) async =>
+      Map<String, dynamic>.from(await _send('GET', '/guest-forms/google/responses/$responseId') as Map);
+
+  static Future<Map<String, dynamic>> assignGoogleFormResponse(String responseId, String reservationId) async =>
+      Map<String, dynamic>.from(await _send('POST', '/guest-forms/google/responses/$responseId/assign',
+          body: {'reservation_id': reservationId}) as Map);
+
+  static Future<Map<String, dynamic>> fetchNotificationSummary() async =>
+      Map<String, dynamic>.from(await _send('GET', '/notifications/summary') as Map);
+
+  static Future<List<dynamic>> fetchNotifications({bool unreadOnly = false, int limit = 30}) async =>
+      await _send('GET', '/notifications', query: {
+        'unread_only': '$unreadOnly',
+        'limit': '$limit',
+      }) as List<dynamic>;
+
+  static Future<void> markNotificationRead(String id) async {
+    await _send('POST', '/notifications/$id/read');
+  }
+
+  static Future<void> markAllNotificationsRead() async {
+    await _send('POST', '/notifications/read-all');
   }
 
   // --- INVOICES & STUDIO ---

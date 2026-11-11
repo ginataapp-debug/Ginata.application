@@ -34,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    if (Uri.base.queryParameters['mode'] == 'signup') _authMode = 1;
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -396,20 +397,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: GinataColors.secondaryContainer.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Image.asset(
-            'assets/images/logo.png',
-            height: 64,
-            errorBuilder: (context, error, stackTrace) => const Icon(
-              Icons.villa,
-              size: 50,
-              color: GinataColors.primary,
-            ),
+        Image.asset(
+          'assets/images/brand_mark.png',
+          height: 76,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.park,
+            size: 56,
+            color: GinataColors.primary,
           ),
         ),
         const SizedBox(height: 14),
@@ -672,11 +666,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       children: [
         const Icon(Icons.shield_outlined, size: 14, color: GinataColors.textSecondary),
         const SizedBox(width: 6),
-        Text(
-          _authMode == 0
-              ? 'Secure token session · Verified against the cloud'
-              : 'Password protected with PBKDF2-SHA256 hashing',
-          style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary),
+        Flexible(
+          child: Text(
+            _authMode == 0
+                ? 'Secure token session · Verified against the cloud'
+                : 'Password protected with PBKDF2-SHA256 hashing',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary),
+          ),
         ),
       ],
     );

@@ -31,3 +31,14 @@ fix_*.py
 .DS_Store
 Thumbs.db
 *.env
+frontend/android/key.properties
+frontend/android/app/*.keystore
+frontend/android/app/*.jks
+
+# Build outputs and local test databases
+ginata property website/app/
+ginata property website/downloads/*.apk
+backend/storage/*.db-shm
+backend/storage/*.db-wal
+backend/storage/ui_validation.db
+backend/storage/*_test.db

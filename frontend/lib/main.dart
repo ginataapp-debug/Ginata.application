@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'theme/ginata_theme.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
+import 'services/notification_center.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/server_unavailable_screen.dart';
 import 'screens/home_dashboard_screen.dart';
 import 'screens/unified_calendar_screen.dart';
 import 'screens/reservations_screen.dart';
@@ -14,6 +17,7 @@ import 'screens/manual_booking_dialog.dart';
 import 'screens/properties_screen.dart';
 import 'screens/finances_screen.dart';
 import 'screens/messages_screen.dart';
+import 'screens/tracker_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,8 +48,8 @@ class AppEntryPoint extends StatefulWidget {
 }
 
 class _AppEntryPointState extends State<AppEntryPoint> {
-  bool _showSplash = true;
-  bool? _isLoggedIn;
+  bool _splashComplete = false;
+  SessionValidation? _sessionValidation;
 
   @override
   void initState() {
@@ -55,54 +59,46 @@ class _AppEntryPointState extends State<AppEntryPoint> {
 
   Future<void> _checkAuth() async {
     final loggedIn = await AuthService.isLoggedIn();
-    bool valid = loggedIn;
-    if (loggedIn) {
-      valid = await AuthService.validateSession();
-    }
+    final validation = loggedIn
+        ? await AuthService.validateSession()
+        : SessionValidation.invalid;
     if (mounted) {
-      setState(() => _isLoggedIn = valid);
+      setState(() => _sessionValidation = validation);
     }
   }
 
   void _onSplashComplete() {
-    if (mounted) {
-      setState(() => _showSplash = false);
-    }
+    if (mounted) setState(() => _splashComplete = true);
   }
 
   void _onLoginSuccess() {
     if (mounted) {
       setState(() {
-        _isLoggedIn = true;
-        _showSplash = true; // Show splash animation after login
+        _sessionValidation = SessionValidation.valid;
+        _splashComplete = true;
       });
     }
   }
 
+  Future<void> _signOut() async {
+    await AuthService.logout();
+    if (mounted) setState(() => _sessionValidation = SessionValidation.invalid);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Still loading auth state
-    if (_isLoggedIn == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF7F8FA),
-        body: Center(
-          child: CircularProgressIndicator(color: GinataColors.primary),
-        ),
-      );
-    }
-
-    // Not logged in → show login
-    if (_isLoggedIn == false) {
-      return LoginScreen(onLoginSuccess: _onLoginSuccess);
-    }
-
-    // Logged in but showing splash
-    if (_showSplash) {
+    if (!_splashComplete || _sessionValidation == null) {
       return SplashScreen(onComplete: _onSplashComplete);
     }
 
-    // Logged in, splash done → main app
-    return const MainNavigationShell();
+    return switch (_sessionValidation!) {
+      SessionValidation.valid => const MainNavigationShell(),
+      SessionValidation.invalid => LoginScreen(onLoginSuccess: _onLoginSuccess),
+      SessionValidation.unavailable => ServerUnavailableScreen(
+          onRetry: _checkAuth,
+          onSignOut: _signOut,
+        ),
+    };
   }
 }
 
@@ -115,6 +111,161 @@ class MainNavigationShell extends StatefulWidget {
 
 class _MainNavigationShellState extends State<MainNavigationShell> {
   int _currentIndex = 0;
+  StreamSubscription<HostNotification>? _notificationSub;
+
+  @override
+  void initState() {
+    super.initState();
+    final center = NotificationCenter.instance;
+    _notificationSub = center.incoming.listen(_onIncomingNotification);
+    center.addListener(_onCenterChanged);
+    center.start();
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    NotificationCenter.instance.removeListener(_onCenterChanged);
+    NotificationCenter.instance.stop();
+    super.dispose();
+  }
+
+  void _onCenterChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _onIncomingNotification(HostNotification n) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 8),
+        backgroundColor: GinataColors.primary,
+        content: Semantics(
+          liveRegion: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(n.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              if (n.body.isNotEmpty)
+                Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            ],
+          ),
+        ),
+        action: SnackBarAction(
+          label: 'VIEW',
+          textColor: GinataColors.brassGold,
+          onPressed: () => _openNotification(n),
+        ),
+      ),
+    );
+  }
+
+  void _openNotification(HostNotification n) {
+    NotificationCenter.instance.markRead(n);
+    final type = n.entityType;
+    if (type == 'google_form_response' || type == 'guest_form_submission') {
+      GuestFormsScreen.focusRequest.value = GuestRecordFocus(type!, n.entityId ?? '');
+      setState(() => _currentIndex = 6);
+    } else if (n.isGuestUpdate || type == 'guest_form') {
+      setState(() => _currentIndex = 6);
+    }
+  }
+
+  void _showNotifications() {
+    final center = NotificationCenter.instance;
+    center.refresh();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+          child: ListenableBuilder(
+            listenable: center,
+            builder: (ctx, _) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Notifications',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: GinataColors.primary),
+                        ),
+                      ),
+                      if (center.unreadCount > 0)
+                        TextButton(onPressed: center.markAllRead, child: const Text('Mark all read')),
+                    ],
+                  ),
+                ),
+                if (center.recent.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 16, 24, 32),
+                    child: Text(
+                      'No notifications yet. New guest check-ins will appear here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: GinataColors.textSecondary),
+                    ),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: center.recent.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final n = center.recent[i];
+                        return ListTile(
+                          leading: Icon(
+                            n.kind == 'google_reconnect' ? Icons.link_off : Icons.how_to_reg_outlined,
+                            color: n.isRead ? GinataColors.textMuted : GinataColors.primary,
+                          ),
+                          title: Text(
+                            n.title,
+                            style: TextStyle(fontWeight: n.isRead ? FontWeight.w500 : FontWeight.bold, fontSize: 14),
+                          ),
+                          subtitle: Text(
+                            '${n.body}${n.body.isEmpty ? '' : '\n'}${_relativeTime(n.createdAt)}',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          isThreeLine: n.body.isNotEmpty,
+                          trailing: n.isRead
+                              ? null
+                              : const Icon(Icons.circle, size: 10, color: GinataColors.brassGold, semanticLabel: 'Unread'),
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _openNotification(n);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _relativeTime(DateTime t) {
+    final diff = DateTime.now().difference(t);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes} min ago';
+    if (diff.inDays < 1) return '${diff.inHours} h ago';
+    if (diff.inDays < 7) return '${diff.inDays} d ago';
+    return '${t.day}/${t.month}/${t.year}';
+  }
 
   void _onTabSelected(int index) {
     setState(() => _currentIndex = index);
@@ -166,7 +317,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               Row(
                 children: [
                   Image.asset(
-                    'assets/images/logo.png',
+                    'assets/images/brand_mark.png',
                     height: 22,
                     errorBuilder: (context, error, stackTrace) => const Icon(Icons.villa, color: GinataColors.primary, size: 20),
                   ),
@@ -183,9 +334,35 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   shrinkWrap: true,
                   physics: const BouncingScrollPhysics(),
                   children: [
+                    ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: GinataColors.secondaryContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Badge(
+                          isLabelVisible: NotificationCenter.instance.unreadCount > 0,
+                          label: Text('${NotificationCenter.instance.unreadCount}'),
+                          child: const Icon(Icons.notifications_outlined, color: GinataColors.primary, size: 20),
+                        ),
+                      ),
+                      title: const Text(
+                        'Notifications',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: GinataColors.textPrimary),
+                      ),
+                      subtitle: const Text('New guest check-ins and sync alerts', style: TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
+                      trailing: const Icon(Icons.chevron_right, size: 20, color: GinataColors.secondary),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _showNotifications();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _moreMenuItem(Icons.track_changes_outlined, 'Stay Tracker', 'Arrivals, departures, guests in-house & balances', 9, ctx),
                     _moreMenuItem(Icons.account_balance_wallet_outlined, 'Finances & Expenses', 'Net profit, house expenses & cash collected', 4, ctx),
                     _moreMenuItem(Icons.text_snippet_outlined, 'Message Templates', 'Pre-built guest messages for Airbnb & more', 5, ctx),
-                    _moreMenuItem(Icons.how_to_reg_outlined, 'Guest Registration Forms', 'Google Forms sync & guest agreements', 6, ctx),
+                    _moreMenuItem(Icons.how_to_reg_outlined, 'Guest Check-ins', 'Google Forms sync & guest check-in review', 6, ctx),
                     _moreMenuItem(Icons.receipt_long_outlined, 'Invoice Studio', 'Generate guest receipts, invoices & vouchers', 7, ctx),
                     _moreMenuItem(Icons.person_outline, 'Host Profile & Settings', 'Edit host info, contacts, payout instructions', 8, ctx),
                     const SizedBox(height: 8),
@@ -278,6 +455,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       const GuestFormsScreen(),
       const InvoiceStudioScreen(),
       const TemplateSettingsScreen(),
+      TrackerScreen(onOpenStays: () => _onTabSelected(3)),
     ];
 
     final isMoreSelected = _currentIndex >= 4;
@@ -348,9 +526,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     String label = 'More';
     if (_currentIndex == 4) label = 'Finances';
     if (_currentIndex == 5) label = 'Templates';
-    if (_currentIndex == 6) label = 'Forms';
+    if (_currentIndex == 6) label = 'Check-ins';
     if (_currentIndex == 7) label = 'Studio';
     if (_currentIndex == 8) label = 'Profile';
+    if (_currentIndex == 9) label = 'Tracker';
+    final unread = NotificationCenter.instance.unreadCount;
 
     return Expanded(
       child: InkWell(
@@ -358,10 +538,14 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isSelected ? Icons.grid_view_rounded : Icons.grid_view_outlined,
-              size: 22,
-              color: isSelected ? GinataColors.primary : GinataColors.textSecondary,
+            Badge(
+              isLabelVisible: unread > 0,
+              label: Text(unread > 9 ? '9+' : '$unread'),
+              child: Icon(
+                isSelected ? Icons.grid_view_rounded : Icons.grid_view_outlined,
+                size: 22,
+                color: isSelected ? GinataColors.primary : GinataColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 3),
             Text(

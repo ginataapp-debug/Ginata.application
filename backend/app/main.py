@@ -1,3 +1,6 @@
+import asyncio
+import logging
+from contextlib import suppress
 from datetime import timezone, datetime, date, timedelta
 from decimal import Decimal
 import secrets
@@ -14,8 +17,11 @@ from backend.app.models.models import (
 )
 from backend.app.api.v1 import (
     auth, properties, reservations, guest_forms, invoices, payments,
-    documents, templates, audit, organization, finances, messages, uploads
+    documents, templates, audit, organization, finances, messages, uploads, google_oauth, notifications
 )
+from backend.app.services.google_forms_sync_service import run_due_syncs
+
+logger = logging.getLogger("uvicorn.error")
 
 # Initialize FastAPI App
 app = FastAPI(
@@ -28,6 +34,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
+    allow_origin_regex=settings.CORS_ALLOWED_ORIGIN_REGEX or None,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,6 +50,7 @@ app.include_router(auth.router, prefix=api_v1_prefix)
 app.include_router(organization.router, prefix=api_v1_prefix)
 app.include_router(properties.router, prefix=api_v1_prefix)
 app.include_router(reservations.router, prefix=api_v1_prefix)
+app.include_router(google_oauth.router, prefix=api_v1_prefix)
 app.include_router(guest_forms.router, prefix=api_v1_prefix)
 app.include_router(invoices.router, prefix=api_v1_prefix)
 app.include_router(payments.router, prefix=api_v1_prefix)
@@ -52,6 +60,7 @@ app.include_router(audit.router, prefix=api_v1_prefix)
 app.include_router(finances.router, prefix=api_v1_prefix)
 app.include_router(messages.router, prefix=api_v1_prefix)
 app.include_router(uploads.router, prefix=api_v1_prefix)
+app.include_router(notifications.router, prefix=api_v1_prefix)
 
 
 def seed_database():
@@ -118,9 +127,44 @@ def seed_database():
         db.close()
 
 
+_poller_status = {"running": False, "cycles": 0, "last_cycle_at": None, "last_cycle_ok": None}
+
+
+async def _google_forms_poller():
+    interval = settings.GOOGLE_FORMS_POLL_SECONDS
+    _poller_status["running"] = True
+    logger.info("Google Forms sync worker started (polling every %ss)", interval)
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                processed = await asyncio.to_thread(run_due_syncs, SessionLocal)
+                _poller_status["last_cycle_ok"] = True
+                if processed:
+                    logger.info("Google Forms sync cycle processed %s form(s)", processed)
+            except Exception:
+                _poller_status["last_cycle_ok"] = False
+                logger.exception("Google Forms polling cycle failed")
+            _poller_status["cycles"] += 1
+            _poller_status["last_cycle_at"] = datetime.now(timezone.utc).isoformat()
+    finally:
+        _poller_status["running"] = False
+
+
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     seed_database()
+    if settings.GOOGLE_FORMS_POLL_SECONDS > 0:
+        app.state.google_forms_poller = asyncio.create_task(_google_forms_poller())
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    task = getattr(app.state, "google_forms_poller", None)
+    if task is not None:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
 
 
 @app.get("/")
@@ -131,5 +175,10 @@ def root_index():
         "status": "operational",
         "api_v1": "/api/v1",
         "docs": "/docs",
-        "design_system": "Forest Green & Warm Cream"
+        "design_system": "Forest Green & Warm Cream",
+        "google_forms_sync": {
+            "polling_seconds": settings.GOOGLE_FORMS_POLL_SECONDS,
+            "push_enabled": bool(settings.GOOGLE_FORMS_PUBSUB_TOPIC),
+            **_poller_status,
+        },
     }
