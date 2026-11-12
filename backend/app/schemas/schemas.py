@@ -52,8 +52,26 @@ class PropertyUnitResponse(PropertyUnitBase, OrmModel):
     created_at: datetime
 
 # Property
-class PropertyBase(BaseModel):
-    name: str
+class PropertyDetails(BaseModel):
+    description: Optional[str] = Field(default=None, max_length=10000)
+    amenities: Optional[List[str]] = Field(default=None, max_length=50)
+    gallery_urls: Optional[List[str]] = Field(default=None, max_length=12)
+    bedrooms: Optional[int] = Field(default=None, ge=0, le=100)
+    bathrooms: Optional[int] = Field(default=None, ge=0, le=100)
+    max_guests: Optional[int] = Field(default=None, ge=1, le=1000)
+
+    @model_validator(mode="after")
+    def validate_channel_urls(self):
+        from backend.app.services.ical_service import validate_feed_url
+        for name in ("airbnb_ical_url", "booking_com_ical_url"):
+            value = getattr(self, name, None)
+            if value:
+                validate_feed_url(value)
+        return self
+
+
+class PropertyBase(PropertyDetails):
+    name: str = Field(min_length=1, max_length=255)
     slug: str
     address: Optional[str] = None
     city: Optional[str] = None
@@ -69,7 +87,7 @@ class PropertyBase(BaseModel):
 class PropertyCreate(PropertyBase):
     units: Optional[List[PropertyUnitCreate]] = None
 
-class PropertyUpdate(BaseModel):
+class PropertyUpdate(PropertyDetails):
     name: Optional[str] = None
     slug: Optional[str] = None
     address: Optional[str] = None
@@ -86,6 +104,7 @@ class PropertyUpdate(BaseModel):
 class PropertyResponse(PropertyBase, OrmModel):
     id: str
     organization_id: str
+    ical_feed_url: str
     ical_feed_token: Optional[str] = None
     last_synced_at: Optional[datetime] = None
     units: List[PropertyUnitResponse] = []
@@ -182,7 +201,7 @@ class ReservationCreate(BaseModel):
     check_in_time: str = "15:00"
     check_out_time: str = "11:00"
     number_of_guests: int = 1
-    nightly_rate: Decimal
+    nightly_rate: Optional[Decimal] = None
     cleaning_fee: Optional[Decimal] = Decimal("0.00")
     service_fee: Optional[Decimal] = Decimal("0.00")
     discount_amount: Optional[Decimal] = Decimal("0.00")
@@ -226,6 +245,8 @@ class ReservationUpdate(BaseModel):
     agent_commission_percent: Optional[Decimal] = None
 
 class ReservationResponse(OrmModel):
+    checked_in_at: Optional[datetime] = None
+    checked_out_at: Optional[datetime] = None
     id: str
     organization_id: str
     property_id: str
@@ -643,6 +664,7 @@ class CalendarReservationSlot(BaseModel):
     currency: str
 
 class PropertyCalendarResponse(BaseModel):
+    external_blocks: List[Dict[str, Any]] = Field(default_factory=list)
     property_id: str
     property_name: str
     units: List[PropertyUnitBase] = []
@@ -821,17 +843,23 @@ class HostUserResponse(OrmModel):
     is_active: bool
     is_verified: bool
     last_login_at: Optional[datetime] = None
+    avatar_url: Optional[str] = None
+    has_password: bool = True
+    google_linked: bool = False
+    google_email: Optional[str] = None
     created_at: datetime
 
 class HostAuthResponse(BaseModel):
     success: bool
     token: Optional[str] = None
     verification_required: bool = False
+    account_created: bool = False
     host: HostUserResponse
     organization_id: str
     message: str
 
 class HostProfileUpdateRequest(BaseModel):
+    current_password: Optional[str] = Field(default=None, max_length=1024)
     full_name: Optional[str] = Field(default=None, min_length=1, max_length=200, pattern=r"\S")
     phone: Optional[str] = None
     email: Optional[EmailStr] = Field(default=None, max_length=255)

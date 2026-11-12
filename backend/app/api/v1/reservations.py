@@ -122,6 +122,8 @@ def confirm_reservation(
     if not res:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
 
+    if res.reservation_status not in ("draft", "confirmed"):
+        raise HTTPException(409, "This reservation cannot be confirmed from its current status")
     res.reservation_status = "confirmed"
     # Ensure guest form token is generated
     get_or_generate_reservation_form_token(db, org_id, res.id)

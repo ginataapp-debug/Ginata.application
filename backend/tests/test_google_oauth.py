@@ -52,6 +52,7 @@ def oauth_env(tmp_path, monkeypatch):
 
     isolated_app.dependency_overrides[get_db] = isolated_db
     monkeypatch.setattr(settings, "REQUIRE_EMAIL_VERIFICATION", False)
+    monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", False)
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client.apps.googleusercontent.com")
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_SECRET", "test-client-secret")
     monkeypatch.setattr(settings, "GOOGLE_REDIRECT_URI", CALLBACK)

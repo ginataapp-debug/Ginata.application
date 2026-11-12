@@ -72,6 +72,10 @@ def check_booking_conflicts(
             reservation_status=res.reservation_status
         ))
 
+    from backend.app.models.models import ExternalCalendarBlock
+    blocks = db.scalars(select(ExternalCalendarBlock).where(ExternalCalendarBlock.organization_id == organization_id, ExternalCalendarBlock.property_id == property_id, ExternalCalendarBlock.start_date < check_out_date, ExternalCalendarBlock.end_date > check_in_date))
+    for block in blocks:
+        conflicts.append(ConflictDetail(reservation_id=block.id, booking_reference=block.source, guest_name="External calendar block", check_in_date=block.start_date, check_out_date=block.end_date, reservation_status="external"))
     return conflicts
 
 
@@ -181,7 +185,9 @@ def create_manual_booking(
     if nights <= 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stay must be at least 1 night")
 
-    nightly_rate = Decimal(str(booking_in.nightly_rate))
+    nightly_rate = Decimal(str(
+        booking_in.nightly_rate if booking_in.nightly_rate is not None else prop.default_nightly_rate
+    ))
     base_amount = nightly_rate * Decimal(nights)
     cleaning_fee = Decimal(str(booking_in.cleaning_fee or Decimal("0.00")))
     service_fee = Decimal(str(booking_in.service_fee or Decimal("0.00")))
@@ -390,6 +396,8 @@ def update_reservation(
     new_check_in = update_in.check_in_date or reservation.check_in_date
     new_check_out = update_in.check_out_date or reservation.check_out_date
     new_unit_id = update_in.unit_id if update_in.unit_id is not None else reservation.unit_id
+    if new_unit_id and not db.scalar(select(PropertyUnit.id).where(PropertyUnit.id == new_unit_id, PropertyUnit.property_id == reservation.property_id)):
+        raise HTTPException(404, "Unit not found for this property")
 
     dates_changed = (new_check_in != reservation.check_in_date) or (new_check_out != reservation.check_out_date) or (new_unit_id != reservation.unit_id)
 

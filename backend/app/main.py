@@ -17,7 +17,7 @@ from backend.app.models.models import (
 )
 from backend.app.api.v1 import (
     auth, properties, reservations, guest_forms, invoices, payments,
-    documents, templates, audit, organization, finances, messages, uploads, google_oauth, notifications
+    documents, templates, audit, organization, finances, messages, uploads, google_oauth, notifications, account, subscription, operations
 )
 from backend.app.services.google_forms_sync_service import run_due_syncs
 
@@ -47,6 +47,9 @@ app.mount("/uploads", StaticFiles(directory=str(settings.UPLOADS_DIR)), name="up
 # Include Routers under API v1
 api_v1_prefix = settings.API_V1_STR
 app.include_router(auth.router, prefix=api_v1_prefix)
+app.include_router(account.router, prefix=api_v1_prefix)
+app.include_router(subscription.router, prefix=api_v1_prefix)
+app.include_router(operations.router, prefix=api_v1_prefix)
 app.include_router(organization.router, prefix=api_v1_prefix)
 app.include_router(properties.router, prefix=api_v1_prefix)
 app.include_router(reservations.router, prefix=api_v1_prefix)
@@ -66,6 +69,8 @@ app.include_router(notifications.router, prefix=api_v1_prefix)
 def seed_database():
     """Initializes tables and sets up standard organization and document templates."""
     Base.metadata.create_all(bind=engine)
+    from backend.app.core.migrations import run_migrations
+    run_migrations(engine)
     db = SessionLocal()
     try:
         org = db.query(Organization).filter(Organization.id == settings.DEFAULT_ORG_ID).first()
@@ -139,6 +144,9 @@ async def _google_forms_poller():
             await asyncio.sleep(interval)
             try:
                 processed = await asyncio.to_thread(run_due_syncs, SessionLocal)
+                if _poller_status["cycles"] % 15 == 0:
+                    from backend.app.services.ical_service import run_due_calendar_syncs
+                    await asyncio.to_thread(run_due_calendar_syncs, SessionLocal)
                 _poller_status["last_cycle_ok"] = True
                 if processed:
                     logger.info("Google Forms sync cycle processed %s form(s)", processed)

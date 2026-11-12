@@ -89,6 +89,7 @@ def env(tmp_path, monkeypatch):
 
     app.dependency_overrides[get_db] = isolated_db
     monkeypatch.setattr(settings, "REQUIRE_EMAIL_VERIFICATION", False)
+    monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", False)
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "test-client.apps.googleusercontent.com")
     monkeypatch.setattr(settings, "GOOGLE_CLIENT_SECRET", "test-client-secret")
     monkeypatch.setattr(settings, "GOOGLE_REDIRECT_URI", "https://ginata-backend.onrender.com/api/v1/integrations/google/callback")

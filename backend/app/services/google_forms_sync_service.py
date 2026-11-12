@@ -446,6 +446,8 @@ def sync_guest_form(db: Session, guest_form: GuestForm) -> dict:
     if sync_state is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Connect a Google Form first.")
 
+    from backend.app.services.subscription_service import require_feature
+    require_feature(db, guest_form.organization_id, "google_forms")
     summary = {"received": 0, "matched": 0, "pending_review": 0, "failed": 0}
     guest_form.google_sync_status = STATUS_SYNCING
     db.commit()
@@ -719,6 +721,10 @@ def run_due_syncs(session_factory: Callable[[], Session], only_guest_form_ids: O
                 (GoogleFormSyncState.next_attempt_at.is_(None)) | (GoogleFormSyncState.next_attempt_at <= now)
             )
         for guest_form in db.execute(query).scalars().all():
+            from backend.app.services.subscription_service import get_subscription, PLANS
+            _, plan = get_subscription(db, guest_form.organization_id)
+            if not PLANS[plan]["google_forms"]:
+                continue
             try:
                 sync_guest_form(db, guest_form)
                 processed += 1

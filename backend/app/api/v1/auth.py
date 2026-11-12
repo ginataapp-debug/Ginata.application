@@ -24,8 +24,10 @@ from backend.app.schemas.schemas import (
     HostVerificationSendRequest, HostVerificationRequest,
 )
 from backend.app.services.audit_service import log_audit_event
+from backend.app.services.subscription_service import start_trial
+from backend.app.core.rate_limit import limit_auth_requests
 
-router = APIRouter(prefix="/auth", tags=["Host Authentication"])
+router = APIRouter(prefix="/auth", tags=["Host Authentication"], dependencies=[Depends(limit_auth_requests)])
 
 
 def _now() -> datetime:
@@ -50,15 +52,15 @@ def _require_smtp() -> None:
         raise HTTPException(503, "Email verification service requires SMTP SSL or STARTTLS.")
 
 
-def _send_verification_email(email: str, code: str) -> None:
+def _send_verification_email(email: str, code: str, purpose: str = "verification") -> None:
     _require_smtp()
     message = EmailMessage()
-    message["Subject"] = "Confirm your Ginata email address"
+    message["Subject"] = "Reset your Ginata password" if purpose == "reset" else "Confirm your Ginata email address"
     message["From"] = settings.SMTP_FROM_EMAIL
     message["To"] = email
     message.set_content(
         f"Your Ginata confirmation code is {code}.\n"
-        f"It expires in {settings.EMAIL_OTP_TTL_MINUTES} minutes and can be used once.\n"
+        f"It expires in {30 if purpose == 'reset' else settings.EMAIL_OTP_TTL_MINUTES} minutes and can be used once.\n"
         "If you did not request this code, ignore this email."
     )
     context = ssl.create_default_context()
@@ -165,6 +167,7 @@ def host_signup(
     db.add(org)
     db.flush()
     _create_default_template(db, org)
+    start_trial(db, org.id)
 
     pwd_hash, salt = hash_password(req.password)
     host_user = HostUser(
@@ -357,6 +360,8 @@ def update_host_profile(
     if req.email is not None:
         clean_email = req.email.strip().lower()
         if clean_email != host.email:
+            if not host.has_password or not req.current_password or not verify_password(req.current_password, host.salt, host.password_hash):
+                raise HTTPException(400, "Your current password is required to change your email.")
             existing = db.execute(select(HostUser).where(HostUser.email == clean_email)).scalar_one_or_none()
             if existing:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is already in use.")

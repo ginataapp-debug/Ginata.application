@@ -45,6 +45,7 @@ def auth_env(tmp_path, monkeypatch):
 
     isolated_app.dependency_overrides[get_db] = isolated_db
     monkeypatch.setattr(settings, "REQUIRE_EMAIL_VERIFICATION", False)
+    monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", False)
     monkeypatch.setattr(settings, "AUTH_SESSION_TTL_HOURS", 24)
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.example.test")
     monkeypatch.setattr(settings, "SMTP_PORT", 587)
@@ -327,6 +328,8 @@ def test_verification_flag_and_email_changes_cannot_bypass_confirmation(auth_env
     accepted = verify(client, otp(smtp)).json()
     token = accepted["token"]
     response = client.patch("/api/v1/auth/profile", headers=headers(token), json={"email": "new@example.com"})
+    assert response.status_code == 400
+    response = client.patch("/api/v1/auth/profile", headers=headers(token), json={"email": "new@example.com", "current_password": PASSWORD})
     assert response.status_code == 200
     assert response.json()["is_verified"] is False
     assert client.get("/api/v1/auth/me", headers=headers(token)).status_code == 401

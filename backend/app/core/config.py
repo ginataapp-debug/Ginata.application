@@ -29,6 +29,16 @@ class Settings(BaseModel):
     SMTP_USE_SSL: bool = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
     SMTP_STARTTLS: bool = os.getenv("SMTP_STARTTLS", "true").lower() == "true"
     SEED_DEMO_HOST: bool = os.getenv("SEED_DEMO_HOST", "false").lower() == "true"
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "").rstrip("/")
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    SUPABASE_STORAGE_BUCKET: str = os.getenv("SUPABASE_STORAGE_BUCKET", "ginata-media")
+    ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
+    SUBSCRIPTION_GRANDFATHER_BEFORE: str = os.getenv("SUBSCRIPTION_GRANDFATHER_BEFORE", "2026-11-13")
+    PUBLIC_API_BASE_URL: str = os.getenv("PUBLIC_API_BASE_URL", "https://ginata-backend.onrender.com").rstrip("/")
+    AUTH_REDIRECT_URLS: list[str] = [value.strip() for value in os.getenv("AUTH_REDIRECT_URLS", "com.ginata.app://login-callback,http://localhost:3000/app/,http://127.0.0.1:3000/app/").split(",") if value.strip()]
+    RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
+    TRIAL_DAYS: int = Field(default=int(os.getenv("TRIAL_DAYS", "14")), ge=1, le=90)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     GOOGLE_REDIRECT_URI: str = os.getenv(

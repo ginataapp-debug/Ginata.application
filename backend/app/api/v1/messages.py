@@ -142,6 +142,10 @@ def create_message_thread(
     db: Session = Depends(get_db),
     org_id: str = Depends(get_current_org_id)
 ):
+    from backend.app.models.models import Property, Reservation
+    for model, entity_id in ((Property, thread_in.property_id), (Reservation, thread_in.reservation_id)):
+        if entity_id and not db.scalar(select(model.id).where(model.id == entity_id, model.organization_id == org_id)):
+            raise HTTPException(404, "Related record not found")
     thread = MessageThread(
         organization_id=org_id,
         property_id=thread_in.property_id,

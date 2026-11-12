@@ -103,14 +103,26 @@ def format_kes(amount: Decimal, currency: str = "KES") -> str:
 
 def get_logo_path(custom_logo_url: Optional[str] = None) -> Optional[str]:
     """Finds valid logo file path."""
-    if custom_logo_url and os.path.exists(custom_logo_url):
-        return custom_logo_url
+    if custom_logo_url:
+        from pathlib import Path
+        from backend.app.services.storage_service import read_image, validate_image
+        from fastapi import HTTPException
+        from urllib.parse import urlsplit
+        try:
+            parsed = urlsplit(custom_logo_url)
+            if parsed.path.startswith("/api/v1/media/") and (not parsed.netloc or custom_logo_url.startswith(settings.PUBLIC_API_BASE_URL + "/api/v1/media/")):
+                data, _ = read_image(parsed.path.rsplit("/", 1)[-1])
+                return io.BytesIO(data)
+            path = settings.UPLOADS_DIR / custom_logo_url.removeprefix("/uploads/") if custom_logo_url.startswith("/uploads/") else Path(custom_logo_url)
+            path = path.resolve()
+            if path.is_relative_to(settings.UPLOADS_DIR.resolve()) and path.is_file():
+                validate_image(path.read_bytes())
+                return str(path)
+        except (OSError, ValueError, HTTPException):
+            pass
     static_logo = settings.STATIC_DIR / "logo.png"
     if static_logo.exists():
         return str(static_logo)
-    root_logo = settings.BASE_DIR.parent / "Ginata App Logo.png"
-    if root_logo.exists():
-        return str(root_logo)
     return None
 
 

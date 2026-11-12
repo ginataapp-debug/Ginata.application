@@ -57,6 +57,9 @@ def create_template(
     db: Session = Depends(get_db),
     org_id: str = Depends(get_current_org_id)
 ):
+    from backend.app.models.models import Property
+    if create_in.property_id and not db.scalar(select(Property.id).where(Property.id == create_in.property_id, Property.organization_id == org_id)):
+        raise HTTPException(404, "Property not found")
     if create_in.is_default:
         existing = db.execute(
             select(DocumentTemplate).where(
@@ -203,31 +206,17 @@ async def upload_template_logo(
     if not tpl:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
 
-    # Validate file type
-    content_type = file.content_type or ""
-    if not (content_type.startswith("image/png") or content_type.startswith("image/jpeg") or content_type.startswith("image/webp")):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid image format. Allowed formats: PNG, JPEG, WEBP."
-        )
-
-    # Secure filename isolated to tenant
-    ext = Path(file.filename or "logo.png").suffix.lower()
-    if not ext:
-        ext = ".png"
-    safe_name = f"logo_{org_id}_{tpl.id[:8]}{ext}"
-    dest_path = settings.UPLOADS_DIR / safe_name
-
-    with open(dest_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # Update template and organization logo URL
-    logo_relative_url = f"/uploads/{safe_name}"
-    tpl.logo_url = str(dest_path)
+    from backend.app.services.storage_service import MAX_IMAGE_BYTES, store_image
+    try:
+        data = await file.read(MAX_IMAGE_BYTES + 1)
+        safe_name, logo_url = store_image(data, org_id)
+    finally:
+        await file.close()
+    tpl.logo_url = logo_url
 
     org = db.execute(select(Organization).where(Organization.id == org_id)).scalar_one_or_none()
     if org:
-        org.logo_url = str(dest_path)
+        org.logo_url = logo_url
 
     log_audit_event(
         db=db,

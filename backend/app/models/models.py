@@ -51,7 +51,69 @@ class HostUser(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    supabase_user_id = Column(String(36), unique=True, nullable=True)
+    google_email = Column(String(255), nullable=True)
+    avatar_url = Column(String(500), nullable=True)
+    reset_code_hash = Column(String(255), nullable=True)
+    reset_code_salt = Column(String(100), nullable=True)
+    reset_expires_at = Column(DateTime, nullable=True)
+    reset_attempts = Column(Integer, default=0, nullable=False, server_default="0")
+
+    @property
+    def has_password(self):
+        return bool(self.password_hash)
+
+    @property
+    def google_linked(self):
+        return bool(self.supabase_user_id)
+
     organization = relationship("Organization", back_populates="host_users")
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True)
+    plan = Column(String(30), nullable=False)
+    status = Column(String(30), nullable=False, default="active")
+    trial_ends_at = Column(DateTime, nullable=True)
+    current_period_end = Column(DateTime, nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class OperationalTask(Base):
+    __tablename__ = "operational_tasks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    property_id = Column(String(36), ForeignKey("properties.id", ondelete="CASCADE"), nullable=True)
+    reservation_id = Column(String(36), ForeignKey("reservations.id", ondelete="SET NULL"), nullable=True)
+    kind = Column(String(30), nullable=False, default="other")
+    title = Column(String(255), nullable=False)
+    notes = Column(Text, nullable=True)
+    priority = Column(String(20), nullable=False, default="normal")
+    status = Column(String(20), nullable=False, default="open")
+    due_date = Column(Date, nullable=True)
+    assignee = Column(String(200), nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    source = Column(String(20), nullable=False, default="manual")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ExternalCalendarBlock(Base):
+    __tablename__ = "external_calendar_blocks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    organization_id = Column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    property_id = Column(String(36), ForeignKey("properties.id", ondelete="CASCADE"), nullable=False, index=True)
+    source = Column(String(30), nullable=False)
+    uid = Column(String(500), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    summary = Column(String(255), nullable=True)
+
+    __table_args__ = (UniqueConstraint("property_id", "source", "uid", name="uq_external_event"),)
 
 
 class HostSession(Base):
@@ -118,6 +180,18 @@ class Property(Base):
     tax_rate = Column(Numeric(5, 4), default=Decimal("0.0000"), nullable=False)  # 0% default (VAT removed)
     image_url = Column(String(500), nullable=True)
 
+    description = Column(Text, nullable=True)
+    amenities = Column(JSON, nullable=True, default=list)
+    gallery_urls = Column(JSON, nullable=True, default=list)
+    bedrooms = Column(Integer, nullable=True)
+    bathrooms = Column(Integer, nullable=True)
+    max_guests = Column(Integer, nullable=True)
+
+    @property
+    def ical_feed_url(self):
+        from backend.app.core.config import settings
+        return f"{settings.PUBLIC_API_BASE_URL}/api/v1/properties/{self.id}/feed.ics?token={self.ical_feed_token}"
+
     # Multi-channel Calendar Sync URLs (iCal feeds)
     airbnb_ical_url = Column(String(500), nullable=True)
     booking_com_ical_url = Column(String(500), nullable=True)
@@ -164,6 +238,7 @@ class Guest(Base):
     email = Column(String(255), nullable=True, index=True)
     phone = Column(String(50), nullable=True, index=True)
     id_type = Column(String(50), nullable=True)  # passport, national_id, driving_license
+    notes = Column(Text, nullable=True)
     id_number_masked = Column(String(100), nullable=True)
     nationality = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -189,6 +264,8 @@ class Reservation(Base):
 
     check_in_date = Column(Date, nullable=False, index=True)
     check_out_date = Column(Date, nullable=False, index=True)
+    checked_in_at = Column(DateTime, nullable=True)
+    checked_out_at = Column(DateTime, nullable=True)
     check_in_time = Column(String(10), default="15:00", nullable=False)
     check_out_time = Column(String(10), default="11:00", nullable=False)
     number_of_guests = Column(Integer, default=1, nullable=False)

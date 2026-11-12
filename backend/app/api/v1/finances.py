@@ -192,6 +192,8 @@ def export_expenses_csv(
     org_id: str = Depends(get_current_org_id)
 ):
     """Exports expenses ledger as CSV spreadsheet file."""
+    from backend.app.services.subscription_service import require_feature
+    require_feature(db, org_id, "finance_export")
     import io
     import csv
     from fastapi.responses import Response

@@ -2,6 +2,7 @@ import hmac
 from typing import List, Optional
 from datetime import timezone, datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -119,6 +120,8 @@ def configure_google_forms(
     db: Session = Depends(get_db),
     host: HostUser = Depends(get_current_host),
 ):
+    from backend.app.services.subscription_service import require_feature
+    require_feature(db, host.organization_id, "google_forms")
     gform = configure_google_form(db, host, config_in.form, config_in.property_id)
     sync_guest_form(db, gform)
     return _google_status_payload(db, host)
@@ -138,6 +141,8 @@ def sync_google_forms(
     db: Session = Depends(get_db),
     host: HostUser = Depends(get_current_host),
 ):
+    from backend.app.services.subscription_service import require_feature
+    require_feature(db, host.organization_id, "google_forms")
     gform = get_google_guest_form(db, host.organization_id)
     if gform is None or not gform.is_active:
         raise HTTPException(status_code=409, detail="Link a Google Form first.")
@@ -217,6 +222,18 @@ def public_get_form(
     db: Session = Depends(get_db)
 ):
     return get_public_form_view(db, token)
+
+@router.get("/public/forms/{token}/fill", response_class=HTMLResponse)
+def public_fill_form(token: str, db: Session = Depends(get_db)):
+    from html import escape
+    import json
+    from fastapi.responses import HTMLResponse
+    view = get_public_form_view(db, token)
+    if view.is_expired or view.is_revoked:
+        return HTMLResponse("<h1>This guest registration link has expired.</h1>", status_code=410)
+    endpoint = json.dumps(f"/api/v1/public/forms/{token}/submit").replace("<", "\\u003c")
+    return HTMLResponse(f'''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ginata guest registration</title><style>body{{font:16px system-ui;background:#f7f4ed;color:#003329;margin:0;padding:24px}}main{{max-width:520px;margin:auto}}input,textarea,button{{box-sizing:border-box;width:100%;padding:14px;margin:8px 0 20px;border:1px solid #b1c4b9;border-radius:12px;font:inherit}}button{{background:#003329;color:white;cursor:pointer}}label{{display:block}}.hidden{{display:none}}</style><main><h1>Welcome to {escape(view.property_name)}</h1><p>{view.check_in_date} – {view.check_out_date}</p><form id="guest"><label>Full name<input name="guest_name" required maxlength="200" autocomplete="name" value="{escape(view.primary_guest_name, quote=True)}"></label><label>Email<input name="guest_email" type="email" autocomplete="email"></label><label>Phone<input name="guest_phone" type="tel" autocomplete="tel"></label><label>Estimated arrival<input name="eta" type="time"></label><label>Special requests<textarea name="special_requests" maxlength="2000"></textarea></label><label class="hidden">Leave blank<input name="honeypot" tabindex="-1" autocomplete="off"></label><button id="submit">Send guest details</button><p id="result" role="status"></p></form></main><script>const form=document.getElementById('guest');form.addEventListener('submit',async event=>{{event.preventDefault();const button=document.getElementById('submit'),result=document.getElementById('result');button.disabled=true;try{{const data=Object.fromEntries(new FormData(form));for(const key of Object.keys(data))if(!data[key])delete data[key];const response=await fetch({endpoint},{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(data)}});if(!response.ok)throw new Error('Unable to submit. Check your details or contact your host.');result.textContent='Thank you. Your guest details have been sent to your host.';form.querySelectorAll('input,textarea').forEach(input=>input.disabled=true);}}catch(error){{result.textContent=error.message;button.disabled=false;}}}});</script></html>''', headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer"})
+
 
 @router.post("/public/forms/{token}/submit", response_model=GuestFormSubmissionResponse)
 def public_submit_form(

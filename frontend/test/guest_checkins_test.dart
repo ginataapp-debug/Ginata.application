@@ -26,6 +26,11 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     ApiService.authToken = 'test-token';
+    ApiService.client = http.Client();
+  });
+
+  tearDown(() {
+    ApiService.client.close();
   });
 
   testWidgets('status chip and header truncate instead of overflowing on narrow screens', (tester) async {
@@ -149,11 +154,10 @@ void main() {
       }
       return _json([]);
     });
+    ApiService.client = client;
 
-    await http.runWithClient(() async {
-      await tester.pumpWidget(MaterialApp(theme: buildGinataTheme(), home: const GuestFormsScreen()));
-      await tester.pumpAndSettle();
-    }, () => client);
+    await tester.pumpWidget(MaterialApp(theme: buildGinataTheme(), home: const GuestFormsScreen()));
+    await tester.pumpAndSettle();
 
     expect(find.text('Garden Villa pre-arrival check-in'), findsOneWidget);
     expect(find.text('1 SYNCED'), findsOneWidget);
@@ -172,11 +176,10 @@ void main() {
       if (request.url.path.contains('google')) return _json({'detail': 'Not Found'}, 404);
       return _json([]);
     });
+    ApiService.client = client;
 
-    await http.runWithClient(() async {
-      await tester.pumpWidget(MaterialApp(theme: buildGinataTheme(), home: const GuestFormsScreen()));
-      await tester.pumpAndSettle();
-    }, () => client);
+    await tester.pumpWidget(MaterialApp(theme: buildGinataTheme(), home: const GuestFormsScreen()));
+    await tester.pumpAndSettle();
 
     expect(find.textContaining('not available on the server yet'), findsOneWidget);
     expect(find.text('UNAVAILABLE'), findsOneWidget);

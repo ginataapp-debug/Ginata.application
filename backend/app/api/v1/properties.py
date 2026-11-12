@@ -6,7 +6,10 @@ from sqlalchemy import select
 
 from backend.app.core.database import get_db
 from backend.app.api.deps import get_current_org_id
-from backend.app.models.models import Property, PropertyUnit, Reservation
+from backend.app.models.models import Property, PropertyUnit, Reservation, ExternalCalendarBlock, Organization
+from backend.app.services.ical_service import block_response, sync_property
+from backend.app.services.subscription_service import check_property_limit, require_feature
+import secrets
 from backend.app.schemas.schemas import (
     PropertyResponse, PropertyCreate, PropertyUpdate, PropertyCalendarResponse, CalendarReservationSlot, PropertyUnitResponse
 )
@@ -23,6 +26,16 @@ def list_properties(
         select(Property).where(Property.organization_id == org_id)
     ).scalars().all()
     return props
+
+@router.get("/external-blocks")
+def list_external_blocks(start: Optional[date] = None, end: Optional[date] = None, db: Session = Depends(get_db), org_id: str = Depends(get_current_org_id)):
+    query = select(ExternalCalendarBlock).where(ExternalCalendarBlock.organization_id == org_id)
+    if start:
+        query = query.where(ExternalCalendarBlock.end_date > start)
+    if end:
+        query = query.where(ExternalCalendarBlock.start_date < end)
+    return [block_response(b) for b in db.scalars(query)]
+
 
 @router.get("/{property_id}", response_model=PropertyResponse)
 def get_property(
@@ -43,6 +56,8 @@ def create_property(
     db: Session = Depends(get_db),
     org_id: str = Depends(get_current_org_id)
 ):
+    db.scalar(select(Organization).where(Organization.id == org_id).with_for_update())
+    check_property_limit(db, org_id)
     # Auto-generate slug if missing or blank
     slug = prop_in.slug.strip() if prop_in.slug else ""
     if not slug:
@@ -61,6 +76,8 @@ def create_property(
         tax_rate=prop_in.tax_rate,
         image_url=prop_in.image_url
     )
+    for field in ("description", "amenities", "gallery_urls", "bedrooms", "bathrooms", "max_guests", "airbnb_ical_url", "booking_com_ical_url"):
+        setattr(prop, field, getattr(prop_in, field))
     db.add(prop)
     db.flush()
 
@@ -134,6 +151,9 @@ def update_property(
         prop.tax_rate = prop_in.tax_rate
     if prop_in.image_url is not None:
         prop.image_url = prop_in.image_url
+    for field in ("description", "amenities", "gallery_urls", "bedrooms", "bathrooms", "max_guests", "airbnb_ical_url", "booking_com_ical_url"):
+        if field in prop_in.model_fields_set:
+            setattr(prop, field, getattr(prop_in, field))
 
     log_audit_event(
         db=db,
@@ -219,7 +239,8 @@ def get_property_calendar(
         property_id=prop.id,
         property_name=prop.name,
         units=[PropertyUnitResponse.model_validate(u) for u in prop.units],
-        slots=slots
+        slots=slots,
+        external_blocks=[block_response(b) for b in db.scalars(select(ExternalCalendarBlock).where(ExternalCalendarBlock.organization_id == org_id, ExternalCalendarBlock.property_id == prop.id))]
     )
 
 # --- iCal Calendar Sync (Airbnb, Booking.com, and Export Feed) ---
@@ -231,7 +252,7 @@ def export_property_ical_feed(
 ):
     """Generates standard iCalendar (.ics) feed of confirmed stays for Airbnb/Booking.com export."""
     prop = db.execute(select(Property).where(Property.id == property_id)).scalar_one_or_none()
-    if not prop:
+    if not prop or not token or not secrets.compare_digest(token, prop.ical_feed_token):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
     reservations = db.execute(
@@ -282,32 +303,8 @@ def sync_property_channels(
     if not prop:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property not found")
 
-    from datetime import datetime, timezone
-    prop.last_synced_at = datetime.now(timezone.utc).replace(tzinfo=None)
-
-    log_audit_event(
-        db=db,
-        organization_id=org_id,
-        entity_type="property",
-        entity_id=prop.id,
-        action="synced_channel_calendars",
-        actor_name="Host",
-        details={
-            "airbnb_configured": bool(prop.airbnb_ical_url),
-            "booking_configured": bool(prop.booking_com_ical_url)
-        }
-    )
-    db.commit()
-    db.refresh(prop)
-
-    return {
-        "status": "success",
-        "message": f"Successfully synchronized channels for {prop.name}",
-        "last_synced_at": prop.last_synced_at,
-        "airbnb_ical_connected": bool(prop.airbnb_ical_url),
-        "booking_com_ical_connected": bool(prop.booking_com_ical_url),
-        "ginata_export_feed_url": f"/api/v1/properties/{prop.id}/feed.ics?token={prop.ical_feed_token}"
-    }
+    require_feature(db, org_id, "ical_sync")
+    return sync_property(db, prop)
 
 
 # --- Property Inventory Tracking ---
@@ -338,6 +335,7 @@ def create_property_inventory_item(
     db: Session = Depends(get_db),
     org_id: str = Depends(get_current_org_id)
 ):
+    get_property(property_id, db, org_id)
     item = PropertyInventoryItem(
         organization_id=org_id,
         property_id=property_id,
