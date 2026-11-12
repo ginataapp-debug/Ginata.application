@@ -60,7 +60,22 @@ def setup_db():
         db.add_all([u1, u2])
         db.flush()
 
-        from backend.app.models.models import Guest, Reservation
+        from backend.app.models.models import Guest, HostUser, Reservation
+        from backend.app.core.security import hash_password
+
+        pwd_hash, salt = hash_password("host123456")
+        db.add(
+            HostUser(
+                organization_id=settings.DEFAULT_ORG_ID,
+                email="host@ginata.ke",
+                password_hash=pwd_hash,
+                salt=salt,
+                full_name="Host",
+                phone="+254 700 000 000",
+                is_active=True,
+                is_verified=True,
+            )
+        )
         g = Guest(
             organization_id=settings.DEFAULT_ORG_ID,
             first_name="Amina",

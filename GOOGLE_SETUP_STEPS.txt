@@ -78,8 +78,8 @@ This configures Supabase's Google provider for the Flutter PKCE login flow.
    Local web preview at localhost (only if you open it with localhost):
    http://localhost:8766/
 
-   Production web app (add after deploying it):
-   https://<your-production-host>/
+   Production Flutter app on Cloudflare Pages (add after deploying it):
+   https://<your-pages-project>.pages.dev/app/
 
    The production redirect must exactly match the browser URL, including its
    path and trailing slash. Do not add the Google-to-Supabase callback here;
@@ -108,8 +108,8 @@ PART C - CONFIGURE THE LIVE RENDER BACKEND
    AUTH_REDIRECT_URLS=com.ginata.app://login-callback,http://127.0.0.1:8766/,http://localhost:8766/
 
    When the web app is deployed, append its exact browser callback URL, for
-   example https://<your-production-host>/. Keep this list aligned with
-   Supabase Authentication > URL Configuration. Do not use a sample or
+   example https://<your-pages-project>.pages.dev/app/. Keep this list aligned
+   with Supabase Authentication > URL Configuration. Do not use a sample or
    inactive domain as the production URL.
 
 3. Add the Google Forms integration settings. Use the same OAuth Web client
@@ -198,6 +198,51 @@ PART D - VERIFY CONFIGURATION WITHOUT CHANGING CUSTOMER DATA
    - GOOGLE_TOKEN_ENCRYPTION_KEY decodes to exactly 32 bytes and
      GOOGLE_OAUTH_STATE_SECRET is at least 32 bytes.
    - Render logs show the relevant callback error without exposing any secret.
+
+
+PART E - DEPLOY THE WEBSITE AND WEB APP TO CLOUDFLARE PAGES
+==========================================================
+
+This repository contains two web experiences: the Ginata marketing site in
+`ginata property website` and the Flutter host app in `frontend`. The
+Cloudflare build script combines them into one Pages site:
+
+1. In Cloudflare, choose Workers & Pages > Create > Pages > Connect to Git.
+    Authorize the GitHub account that owns `ginataapp-debug/Ginata.application`
+    and select that repository.
+
+2. Set the Pages build configuration:
+    - Production branch: `main`
+    - Root directory: `/` (repository root)
+    - Build command: `bash frontend/scripts/build_cloudflare.sh`
+    - Build output directory: `frontend/build/cloudflare-pages`
+    - Environment variable `FLUTTER_VERSION`: not required; the script pins
+      Flutter 3.44.6.
+
+    The build publishes the marketing website at `/` and the Flutter host app
+    at `/app/`. The script downloads the pinned Flutter SDK when the build
+    environment does not already have it. Do not configure `API_URL` as a
+    secret; the app only needs the public Ginata API endpoint.
+
+3. After the first successful deployment, note the assigned Pages domain,
+    normally `https://<project-name>.pages.dev`. Set the host app's exact
+    callback to `https://<project-name>.pages.dev/app/`.
+
+4. Add that exact callback URL to Supabase Authentication > URL Configuration
+    and to Render's `AUTH_REDIRECT_URLS`. Add the Pages origin (without `/app/`)
+    to Render's `CORS_ALLOWED_ORIGINS`, for example
+    `https://<project-name>.pages.dev`. Use the real Pages domain, not the
+    placeholder. Repeat these entries if you attach a custom domain.
+
+5. Redeploy the backend after updating its environment variables. Test the
+    marketing-page sign-in link (which opens `/app/`) and the Flutter callback.
+    Confirm `GET /api/v1/auth/config` reports enabled and the backend accepts
+    the callback before attempting Google consent.
+
+6. The marketing download page links to this repository's GitHub Releases.
+    Upload the Android APK there as a release asset after you create a release;
+    do not copy it into the Pages output. Cloudflare Pages limits each asset to
+    25 MiB, while the APK is about 61 MB.
 
 
 WHAT IS AND IS NOT ENABLED BY THESE STEPS

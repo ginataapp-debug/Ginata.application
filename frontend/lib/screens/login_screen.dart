@@ -514,31 +514,157 @@ class _LoginScreenState extends State<LoginScreen>
         statusBarColor: Colors.transparent,
       ),
       child: Scaffold(
-        backgroundColor: GinataColors.background,
+        backgroundColor: const Color(0xFFF2F2EB),
         body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: FadeTransition(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 900;
+              return FadeTransition(
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 420),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 24),
-                        _buildCard(),
-                        const SizedBox(height: 18),
-                        _buildFooter(),
-                      ],
-                    ),
-                  ),
+                  child: isWide
+                      ? Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: 1240,
+                              minHeight: constraints.maxHeight,
+                            ),
+                            child: Container(
+                              margin: const EdgeInsets.all(28),
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                color: GinataColors.surface,
+                                borderRadius: BorderRadius.circular(30),
+                                border: Border.all(
+                                  color: const Color(0x1C003329),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: GinataColors.primary.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    blurRadius: 48,
+                                    offset: const Offset(0, 20),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(flex: 11, child: _buildStoryPanel()),
+                                  Expanded(
+                                    flex: 10,
+                                    child: SingleChildScrollView(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 48,
+                                        vertical: 40,
+                                      ),
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minHeight: constraints.maxHeight - 80,
+                                        ),
+                                        child: Center(
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                              maxWidth: 440,
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                                _buildDesktopBrand(),
+                                                const SizedBox(height: 48),
+                                                Text(
+                                                  _authMode == 0
+                                                      ? 'Welcome back'
+                                                      : 'Make room for better hosting',
+                                                  style: const TextStyle(
+                                                    color: GinataColors
+                                                        .textPrimary,
+                                                    fontSize: 30,
+                                                    height: 1.12,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: -1.1,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 10),
+                                                Text(
+                                                  _authMode == 0
+                                                      ? 'Your stays are in good hands. Sign in to pick up where you left off.'
+                                                      : 'Create your host account and bring every stay into one considered workspace.',
+                                                  style: const TextStyle(
+                                                    color: GinataColors
+                                                        .textSecondary,
+                                                    fontSize: 14,
+                                                    height: 1.55,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 28),
+                                                _buildCard(),
+                                                const SizedBox(height: 18),
+                                                _buildFooter(),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 440),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildHeader(),
+                                  const SizedBox(height: 28),
+                                  Text(
+                                    _authMode == 0
+                                        ? 'Your properties, in good hands.'
+                                        : 'A better home for your hosting.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: GinataColors.textPrimary,
+                                      fontSize: 25,
+                                      height: 1.15,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.8,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _authMode == 0
+                                        ? 'Sign in to your calm, connected host workspace.'
+                                        : 'One thoughtful workspace for every stay.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: GinataColors.textSecondary,
+                                      fontSize: 14,
+                                      height: 1.45,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  _buildCard(),
+                                  const SizedBox(height: 18),
+                                  _buildFooter(),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -546,32 +672,300 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Widget _buildHeader() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE5EAE1),
+              borderRadius: BorderRadius.circular(17),
+            ),
+            child: Image.asset(
+              'assets/images/brand_mark.png',
+              errorBuilder: (context, error, stackTrace) => const Icon(
+                Icons.park_outlined,
+                size: 34,
+                color: GinataColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'GINATA',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: GinataColors.primary,
+                  letterSpacing: 4.2,
+                ),
+              ),
+              SizedBox(height: 3),
+              Text(
+                'THE HOST WORKSPACE',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: GinataColors.textMuted,
+                  letterSpacing: 1.6,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopBrand() {
+    return Row(
       children: [
         Image.asset(
           'assets/images/brand_mark.png',
-          height: 76,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.park, size: 56, color: GinataColors.primary),
+          width: 40,
+          height: 40,
+          errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.park_outlined,
+            size: 36,
+            color: GinataColors.primary,
+          ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(width: 10),
         const Text(
           'GINATA',
           style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
             color: GinataColors.primary,
-            letterSpacing: 6,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 3.2,
           ),
         ),
-        const SizedBox(height: 4),
-        const Text(
-          'Property Management · Host Portal',
-          style: TextStyle(
-            fontSize: 13,
-            color: GinataColors.textSecondary,
-            letterSpacing: 0.5,
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF2F5EF),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.shield_outlined,
+                size: 14,
+                color: GinataColors.primary,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'SECURE HOST ACCESS',
+                style: TextStyle(
+                  color: GinataColors.primary,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStoryPanel() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF174B3E), Color(0xFF062C25)],
+            ),
+          ),
+        ),
+        Positioned(
+          top: -150,
+          right: -155,
+          child: Container(
+            width: 390,
+            height: 390,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -95,
+          right: -100,
+          child: Container(
+            width: 280,
+            height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(36),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F2E9),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Image.asset(
+                        'assets/images/brand_mark.png',
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.park_outlined,
+                              color: GinataColors.primary,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'GINATA',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3.6,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 44),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_outlined,
+                        color: Color(0xFFE1C38B),
+                        size: 15,
+                      ),
+                      SizedBox(width: 7),
+                      Text(
+                        'MADE FOR THE WAY YOU HOST',
+                        style: TextStyle(
+                          color: Color(0xFFF0E8D7),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 26),
+                const Text(
+                  'A more\nthoughtful stay\nstarts here.',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 40,
+                    height: 1.08,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -1.8,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Bring your properties, guests, and the little details of great hosting into one beautifully clear place.',
+                  style: TextStyle(
+                    color: Color(0xFFD4E2D9),
+                    fontSize: 15,
+                    height: 1.65,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.09),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      _StoryIcon(icon: Icons.calendar_month_outlined),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Every stay, in rhythm',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Bookings, guest details, and finances together.',
+                              style: TextStyle(
+                                color: Color(0xFFD4E2D9),
+                                fontSize: 11,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        color: Color(0xFFE1C38B),
+                        size: 17,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'DESIGNED FOR INDEPENDENT HOSTS',
+                  style: TextStyle(
+                    color: Color(0xFFAEC7B8),
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -582,17 +976,17 @@ class _LoginScreenState extends State<LoginScreen>
     return Container(
       decoration: BoxDecoration(
         color: GinataColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0x14101828)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0x12101828)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: GinataColors.primary.withValues(alpha: 0.055),
+            blurRadius: 26,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(22),
       child: Form(
         key: _formKey,
         child: Column(
@@ -694,25 +1088,38 @@ class _LoginScreenState extends State<LoginScreen>
             const SizedBox(height: 20),
 
             SizedBox(
-              height: 48,
+              height: 50,
               child: OutlinedButton.icon(
                 onPressed: _isLoading ? null : _handleGoogleSignIn,
-                icon: const Text(
-                  'G',
-                  style: TextStyle(
-                    color: Color(0xFF4285F4),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                icon: Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F7FA),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'G',
+                    style: TextStyle(
+                      color: Color(0xFF4285F4),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 label: const Text('Continue with Google'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: GinataColors.primary,
+                  foregroundColor: GinataColors.textPrimary,
                   side: BorderSide(
-                    color: GinataColors.primary.withValues(alpha: 0.25),
+                    color: const Color(0xFF172B24).withValues(alpha: 0.14),
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -728,7 +1135,30 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: Divider(color: Colors.black.withValues(alpha: 0.1)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'OR CONTINUE WITH EMAIL',
+                    style: TextStyle(
+                      color: GinataColors.textMuted.withValues(alpha: 0.9),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Divider(color: Colors.black.withValues(alpha: 0.1)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
 
             if (_authMode == 1) ...[
               // Full Name
@@ -919,6 +1349,23 @@ class _LoginScreenState extends State<LoginScreen>
       ],
     );
   }
+}
+
+class _StoryIcon extends StatelessWidget {
+  const _StoryIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 42,
+    height: 42,
+    decoration: BoxDecoration(
+      color: const Color(0xFFE1C38B).withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(13),
+    ),
+    child: Icon(icon, color: const Color(0xFFE1C38B), size: 21),
+  );
 }
 
 class _PasswordResetDialog extends StatefulWidget {

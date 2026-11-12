@@ -22,9 +22,8 @@ import 'screens/finances_screen.dart';
 import 'screens/messages_screen.dart';
 import 'screens/tracker_screen.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await ApiService.init();
   runApp(const GinataApp());
 }
 
@@ -63,6 +62,22 @@ class _AppEntryPointState extends State<AppEntryPoint> {
   }
 
   Future<void> _initializeAuth() async {
+    try {
+      await ApiService.init();
+    } catch (error, stackTrace) {
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stackTrace,
+          library: 'Ginata startup',
+        ),
+      );
+      if (mounted) {
+        setState(() => _sessionValidation = SessionValidation.unavailable);
+      }
+      return;
+    }
+
     if (kIsWeb) {
       await _handleGoogleCallback(Uri.base);
     } else {

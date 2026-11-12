@@ -69,6 +69,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('host sign-in screen adapts to a wide desktop viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 960);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: LoginScreen(onLoginSuccess: () {})),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('A more\nthoughtful stay\nstarts here.'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.text('Sign In to Host Portal'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('app opens with the splash and then the host portal', (
     tester,
   ) async {

@@ -65,13 +65,9 @@
   </div>
   <script>
     const splash = document.getElementById('splash');
-    const observer = new MutationObserver(() => {
-      if (document.querySelector('flutter-view')) {
-        splash.remove();
-        observer.disconnect();
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('flutter-first-frame', () => {
+      splash.remove();
+    }, { once: true });
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
