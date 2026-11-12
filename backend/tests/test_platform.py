@@ -47,6 +47,9 @@ def test_google_config_authorize_and_new_account(platform_env, monkeypatch):
     assert not created.json()["host"]["has_password"]
     sub = client.get("/api/v1/subscription", headers=headers(created.json()["token"]))
     assert sub.json()["plan"] == "trial"
+    assert client.get(
+        "/api/v1/subscription", headers=headers("supabase-access-token")
+    ).status_code == 401
     assert client.post("/api/v1/auth/google", json=GOOGLE_BODY).json()["account_created"] is False
 
 

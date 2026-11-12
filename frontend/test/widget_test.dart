@@ -11,7 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('animated splash assembles the tree and reveals the brand', (tester) async {
+  testWidgets('animated splash assembles the tree and reveals the brand', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -20,17 +22,19 @@ void main() {
     final semantics = tester.ensureSemantics();
 
     var completed = false;
-    await tester.pumpWidget(MaterialApp(
-      home: SplashScreen(onComplete: () => completed = true),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(home: SplashScreen(onComplete: () => completed = true)),
+    );
 
     expect(find.byType(Image), findsWidgets);
     expect(find.text('PROPERTY MANAGEMENT'), findsOneWidget);
     expect(
-      find.byWidgetPredicate((widget) =>
-          widget is Image &&
-          widget.image is AssetImage &&
-          (widget.image as AssetImage).assetName == 'assets/images/logo.png'),
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName == 'assets/images/logo.png',
+      ),
       findsNothing,
     );
 
@@ -41,30 +45,50 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('host sign-in screen is usable on a phone viewport', (tester) async {
+  testWidgets('host sign-in screen is usable on a phone viewport', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(360, 740);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(MaterialApp(home: LoginScreen(onLoginSuccess: () {})));
+    await tester.pumpWidget(
+      MaterialApp(home: LoginScreen(onLoginSuccess: () {})),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Sign In to Host Portal'), findsOneWidget);
     expect(find.text('Create Account'), findsOneWidget);
+    expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
+    await tester.tap(find.text('Create Account'));
+    await tester.pumpAndSettle();
+    expect(find.text('Continue with Google'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNWidgets(5));
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('app opens with the splash and then the host portal', (tester) async {
+  testWidgets('app opens with the splash and then the host portal', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
-    const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
-      if (call.method == 'read') return null;
-      return null;
-    });
+    const channel = MethodChannel(
+      'plugins.it_nomads.com/flutter_secure_storage',
+    );
+    const appLinksChannel = MethodChannel('com.llfbandit.app_links/messages');
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          if (call.method == 'read') return null;
+          return null;
+        });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(appLinksChannel, (call) async => null);
     addTearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appLinksChannel, null);
     });
 
     await tester.pumpWidget(const GinataApp());
@@ -77,12 +101,14 @@ void main() {
 
   testWidgets('reduced-motion splash completes exactly once', (tester) async {
     var completed = 0;
-    await tester.pumpWidget(MaterialApp(
-      home: MediaQuery(
-        data: const MediaQueryData(disableAnimations: true),
-        child: SplashScreen(onComplete: () => completed++),
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: SplashScreen(onComplete: () => completed++),
+        ),
       ),
-    ));
+    );
     await tester.pump(const Duration(milliseconds: 500));
     expect(completed, 1);
     expect(tester.takeException(), isNull);
@@ -93,15 +119,21 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(const MaterialApp(
-      home: Scaffold(body: PaymentModal(
-        reservationId: 'test-reservation',
-        totalAmount: 1001.50,
-        balanceDue: 1001.50,
-      )),
-    ));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: PaymentModal(
+            reservationId: 'test-reservation',
+            totalAmount: 1001.50,
+            balanceDue: 1001.50,
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
-    final amount = tester.widget<TextFormField>(find.byType(TextFormField).first);
+    final amount = tester.widget<TextFormField>(
+      find.byType(TextFormField).first,
+    );
     expect(amount.controller!.text, '1001.50');
     await tester.tap(find.text('Half'));
     await tester.pump();

@@ -1,18 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/ginata_theme.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
+  final String? googleAuthMessage;
 
-  const LoginScreen({super.key, required this.onLoginSuccess});
+  const LoginScreen({
+    super.key,
+    required this.onLoginSuccess,
+    this.googleAuthMessage,
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
   // Mode: 0 = Sign In, 1 = Sign Up
@@ -43,13 +51,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       parent: _fadeController,
       curve: Curves.easeOut,
     );
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.04),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeOutCubic,
-    ));
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(
+          CurvedAnimation(parent: _fadeController, curve: Curves.easeOutCubic),
+        );
     _fadeController.forward();
   }
 
@@ -62,6 +67,46 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final redirectUri = kIsWeb
+          ? AuthService.googleWebRedirectUri(Uri.base)
+          : AuthService.androidGoogleRedirectUri;
+      final result = await AuthService.beginGoogleSignIn(
+        redirectUri: redirectUri,
+      );
+      if (!mounted) return;
+      if (result['success'] != true) {
+        _showError(
+          result['message']?.toString() ?? 'Could not start Google sign-in.',
+        );
+        return;
+      }
+
+      final opened = await launchUrl(
+        Uri.parse(result['url']!.toString()),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) {
+        await AuthService.cancelGoogleSignIn();
+        _showError('Could not open Google sign-in. Please try again.');
+        return;
+      }
+      if (!kIsWeb) {
+        _showNotice(
+          'Complete Google sign-in in your browser, then return to Ginata.',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        _showError('Google sign-in could not be started. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _handleSubmit() async {
@@ -101,7 +146,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           fullName: _nameController.text.trim(),
           email: _emailController.text.trim(),
           password: _passwordController.text,
-          phone: _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
+          phone: _phoneController.text.trim().isNotEmpty
+              ? _phoneController.text.trim()
+              : null,
         );
 
         if (!mounted) return;
@@ -118,7 +165,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           _showError(res['message'] ?? 'Unable to create account.');
         }
       }
-
     } catch (e) {
       if (!mounted) return;
       _showError('Connection error. Please try again.');
@@ -157,11 +203,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   enabled: !busy,
                   keyboardType: TextInputType.number,
                   autofillHints: const [AutofillHints.oneTimeCode],
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-                  decoration: InputDecoration(labelText: 'Six-digit code', errorText: error),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: 'Six-digit code',
+                    errorText: error,
+                  ),
                 ),
                 const SizedBox(height: 8),
-                const Text('Codes expire and can only be used once. Check your spam folder.'),
+                const Text(
+                  'Codes expire and can only be used once. Check your spam folder.',
+                ),
               ],
             ),
             actions: [
@@ -170,39 +224,64 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 child: const Text('Cancel'),
               ),
               TextButton(
-                onPressed: busy ? null : () async {
-                  setDialogState(() { busy = true; error = null; });
-                  final response = await AuthService.sendVerification(email, password);
-                  if (!ctx.mounted) return;
-                  setDialogState(() {
-                    busy = false;
-                    if (response['success'] == true) {
-                      notice = response['message']?.toString() ?? 'Code sent.';
-                    } else {
-                      error = response['message']?.toString() ?? 'Could not send code.';
-                    }
-                  });
-                },
+                onPressed: busy
+                    ? null
+                    : () async {
+                        setDialogState(() {
+                          busy = true;
+                          error = null;
+                        });
+                        final response = await AuthService.sendVerification(
+                          email,
+                          password,
+                        );
+                        if (!ctx.mounted) return;
+                        setDialogState(() {
+                          busy = false;
+                          if (response['success'] == true) {
+                            notice =
+                                response['message']?.toString() ?? 'Code sent.';
+                          } else {
+                            error =
+                                response['message']?.toString() ??
+                                'Could not send code.';
+                          }
+                        });
+                      },
                 child: const Text('Send new code'),
               ),
               ElevatedButton(
-                onPressed: busy ? null : () async {
-                  if (!RegExp(r'^[0-9]{6}$').hasMatch(codeController.text)) {
-                    setDialogState(() => error = 'Enter the six-digit code.');
-                    return;
-                  }
-                  setDialogState(() { busy = true; error = null; });
-                  final response = await AuthService.verifyEmail(email, codeController.text);
-                  if (!ctx.mounted) return;
-                  if (response['success'] == true) {
-                    Navigator.of(ctx).pop(response);
-                  } else {
-                    setDialogState(() {
-                      busy = false;
-                      error = response['message']?.toString() ?? 'Could not confirm email.';
-                    });
-                  }
-                },
+                onPressed: busy
+                    ? null
+                    : () async {
+                        if (!RegExp(
+                          r'^[0-9]{6}$',
+                        ).hasMatch(codeController.text)) {
+                          setDialogState(
+                            () => error = 'Enter the six-digit code.',
+                          );
+                          return;
+                        }
+                        setDialogState(() {
+                          busy = true;
+                          error = null;
+                        });
+                        final response = await AuthService.verifyEmail(
+                          email,
+                          codeController.text,
+                        );
+                        if (!ctx.mounted) return;
+                        if (response['success'] == true) {
+                          Navigator.of(ctx).pop(response);
+                        } else {
+                          setDialogState(() {
+                            busy = false;
+                            error =
+                                response['message']?.toString() ??
+                                'Could not confirm email.';
+                          });
+                        }
+                      },
                 child: Text(busy ? 'Please wait...' : 'Confirm email'),
               ),
             ],
@@ -222,7 +301,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   Future<void> _showPasswordReset() async {
     final resetEmail = await showDialog<String>(
       context: context,
-      builder: (_) => _PasswordResetDialog(initialEmail: _emailController.text.trim()),
+      builder: (_) =>
+          _PasswordResetDialog(initialEmail: _emailController.text.trim()),
     );
     if (!mounted || resetEmail == null) return;
     _emailController.text = resetEmail;
@@ -258,13 +338,21 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 color: GinataColors.secondaryContainer.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.verified_user, color: GinataColors.primary, size: 24),
+              child: const Icon(
+                Icons.verified_user,
+                color: GinataColors.primary,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 isNewAccount ? 'Account Created' : 'Signed In Securely',
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: GinataColors.primary),
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: GinataColors.primary,
+                ),
               ),
             ),
           ],
@@ -273,11 +361,22 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(message, style: const TextStyle(fontSize: 13, color: GinataColors.textSecondary)),
+            Text(
+              message,
+              style: const TextStyle(
+                fontSize: 13,
+                color: GinataColors.textSecondary,
+              ),
+            ),
             const SizedBox(height: 16),
-            _confirmRow(Icons.person_outline, 'Host', name.isNotEmpty ? name : 'Host'),
+            _confirmRow(
+              Icons.person_outline,
+              'Host',
+              name.isNotEmpty ? name : 'Host',
+            ),
             _confirmRow(Icons.email_outlined, 'Email', email),
-            if (phone.isNotEmpty) _confirmRow(Icons.phone_outlined, 'Phone', phone),
+            if (phone.isNotEmpty)
+              _confirmRow(Icons.phone_outlined, 'Phone', phone),
             _confirmRow(
               verified ? Icons.verified : Icons.pending_outlined,
               'Status',
@@ -292,12 +391,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.lock_outline, size: 16, color: GinataColors.secondary),
+                  Icon(
+                    Icons.lock_outline,
+                    size: 16,
+                    color: GinataColors.secondary,
+                  ),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Your device uses an expiring session token. Use HTTPS for secure connections. Signing out revokes this device\'s session.',
-                      style: TextStyle(fontSize: 11, color: GinataColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: GinataColors.textSecondary,
+                      ),
                     ),
                   ),
                 ],
@@ -313,10 +419,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 backgroundColor: GinataColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Continue to Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Continue to Dashboard',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -335,12 +446,22 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           const SizedBox(width: 8),
           SizedBox(
             width: 52,
-            child: Text(label, style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary)),
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: GinataColors.textSecondary,
+              ),
+            ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: GinataColors.textPrimary),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: GinataColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -360,23 +481,38 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               Expanded(
                 child: Text(
                   message,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ],
           ),
           backgroundColor: GinataColors.alertTerracotta,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         ),
+      );
+  }
+
+  void _showNotice(String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: GinataColors.primary),
       );
   }
 
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
+      value: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       child: Scaffold(
         backgroundColor: GinataColors.background,
         body: SafeArea(
@@ -416,11 +552,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         Image.asset(
           'assets/images/brand_mark.png',
           height: 76,
-          errorBuilder: (context, error, stackTrace) => const Icon(
-            Icons.park,
-            size: 56,
-            color: GinataColors.primary,
-          ),
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.park, size: 56, color: GinataColors.primary),
         ),
         const SizedBox(height: 14),
         const Text(
@@ -486,18 +619,30 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       child: Container(
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: _authMode == 0 ? Colors.white : Colors.transparent,
+                          color: _authMode == 0
+                              ? Colors.white
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: _authMode == 0
-                              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1))]
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
                               : null,
                         ),
                         child: Text(
                           'Sign In',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: _authMode == 0 ? FontWeight.bold : FontWeight.w500,
-                            color: _authMode == 0 ? GinataColors.primary : GinataColors.textSecondary,
+                            fontWeight: _authMode == 0
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: _authMode == 0
+                                ? GinataColors.primary
+                                : GinataColors.textSecondary,
                           ),
                         ),
                       ),
@@ -514,18 +659,30 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       child: Container(
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: _authMode == 1 ? Colors.white : Colors.transparent,
+                          color: _authMode == 1
+                              ? Colors.white
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                           boxShadow: _authMode == 1
-                              ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1))]
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ]
                               : null,
                         ),
                         child: Text(
                           'Create Account',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: _authMode == 1 ? FontWeight.bold : FontWeight.w500,
-                            color: _authMode == 1 ? GinataColors.primary : GinataColors.textSecondary,
+                            fontWeight: _authMode == 1
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: _authMode == 1
+                                ? GinataColors.primary
+                                : GinataColors.textSecondary,
                           ),
                         ),
                       ),
@@ -534,6 +691,43 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+
+            SizedBox(
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: _isLoading ? null : _handleGoogleSignIn,
+                icon: const Text(
+                  'G',
+                  style: TextStyle(
+                    color: Color(0xFF4285F4),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                label: const Text('Continue with Google'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: GinataColors.primary,
+                  side: BorderSide(
+                    color: GinataColors.primary.withValues(alpha: 0.25),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            if (widget.googleAuthMessage != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                widget.googleAuthMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: GinataColors.alertTerracotta,
+                  fontSize: 12,
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
 
             if (_authMode == 1) ...[
@@ -606,7 +800,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
-              textInputAction: _authMode == 1 ? TextInputAction.next : TextInputAction.done,
+              textInputAction: _authMode == 1
+                  ? TextInputAction.next
+                  : TextInputAction.done,
               onFieldSubmitted: (_) {
                 if (_authMode == 0) _handleSubmit();
               },
@@ -616,10 +812,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 prefixIcon: const Icon(Icons.lock_outline, size: 20),
                 suffixIcon: IconButton(
                   icon: Icon(
-                    _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
                     size: 20,
                   ),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
               validator: (val) {
@@ -665,17 +864,27 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 style: ElevatedButton.styleFrom(
                   backgroundColor: GinataColors.primary,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: _isLoading
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       )
                     : Text(
-                        _authMode == 0 ? 'Sign In to Host Portal' : 'Create Host Account',
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                        _authMode == 0
+                            ? 'Sign In to Host Portal'
+                            : 'Create Host Account',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ),
@@ -689,7 +898,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.shield_outlined, size: 14, color: GinataColors.textSecondary),
+        const Icon(
+          Icons.shield_outlined,
+          size: 14,
+          color: GinataColors.textSecondary,
+        ),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
@@ -697,7 +910,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 ? 'Secure token session · Verified against the cloud'
                 : 'Password protected with PBKDF2-SHA256 hashing',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 11,
+              color: GinataColors.textSecondary,
+            ),
           ),
         ),
       ],
@@ -756,10 +972,13 @@ class _PasswordResetDialogState extends State<_PasswordResetDialog> {
       _busy = false;
       if (response['success'] == true) {
         _codeSent = true;
-        _notice = response['message']?.toString() ??
+        _notice =
+            response['message']?.toString() ??
             'If an account exists for that email, a reset code has been sent.';
       } else {
-        _error = response['message']?.toString() ?? 'Could not request a reset code.';
+        _error =
+            response['message']?.toString() ??
+            'Could not request a reset code.';
       }
     });
   }
@@ -793,79 +1012,92 @@ class _PasswordResetDialogState extends State<_PasswordResetDialog> {
     } else {
       setState(() {
         _busy = false;
-        _error = response['message']?.toString() ?? 'Could not reset your password.';
+        _error =
+            response['message']?.toString() ?? 'Could not reset your password.';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-        title: const Text('Reset your password'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text('We’ll email a one-time reset code if this account exists.'),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _emailController,
-                enabled: !_busy,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(labelText: 'Account email'),
+    title: const Text('Reset your password'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'We’ll email a one-time reset code if this account exists.',
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _emailController,
+            enabled: !_busy,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(labelText: 'Account email'),
+          ),
+          if (_codeSent) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _codeController,
+              enabled: !_busy,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              decoration: const InputDecoration(
+                labelText: 'Six-digit reset code',
               ),
-              if (_codeSent) ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _codeController,
-                  enabled: !_busy,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(6),
-                  ],
-                  decoration: const InputDecoration(labelText: 'Six-digit reset code'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _passwordController,
-                  enabled: !_busy,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'New password'),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _confirmController,
-                  enabled: !_busy,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Confirm new password'),
-                ),
-              ],
-              if (_notice != null) ...[
-                const SizedBox(height: 12),
-                Text(_notice!, style: const TextStyle(color: GinataColors.secondary)),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: GinataColors.alertTerracotta)),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _busy ? null : () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: _busy ? null : _requestCode,
-            child: Text(_codeSent ? 'Resend code' : 'Send code'),
-          ),
-          if (_codeSent)
-            ElevatedButton(
-              onPressed: _busy ? null : _resetPassword,
-              child: Text(_busy ? 'Please wait...' : 'Reset password'),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordController,
+              enabled: !_busy,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New password'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _confirmController,
+              enabled: !_busy,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Confirm new password',
+              ),
+            ),
+          ],
+          if (_notice != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _notice!,
+              style: const TextStyle(color: GinataColors.secondary),
+            ),
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              style: const TextStyle(color: GinataColors.alertTerracotta),
+            ),
+          ],
         ],
-      );
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _busy ? null : () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      TextButton(
+        onPressed: _busy ? null : _requestCode,
+        child: Text(_codeSent ? 'Resend code' : 'Send code'),
+      ),
+      if (_codeSent)
+        ElevatedButton(
+          onPressed: _busy ? null : _resetPassword,
+          child: Text(_busy ? 'Please wait...' : 'Reset password'),
+        ),
+    ],
+  );
 }

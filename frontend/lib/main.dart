@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'theme/ginata_theme.dart';
 import 'services/auth_service.dart';
 import 'services/api_service.dart';
@@ -50,11 +53,65 @@ class AppEntryPoint extends StatefulWidget {
 class _AppEntryPointState extends State<AppEntryPoint> {
   bool _splashComplete = false;
   SessionValidation? _sessionValidation;
+  String? _googleAuthMessage;
+  StreamSubscription<Uri>? _deepLinkSubscription;
 
   @override
   void initState() {
     super.initState();
-    _checkAuth();
+    _initializeAuth();
+  }
+
+  Future<void> _initializeAuth() async {
+    if (kIsWeb) {
+      await _handleGoogleCallback(Uri.base);
+    } else {
+      final links = AppLinks();
+      try {
+        final initialUri = await links.getInitialLink();
+        if (initialUri != null) await _handleGoogleCallback(initialUri);
+      } on UnimplementedError {
+        // Platforms without an App Links implementation still use normal auth.
+      } on MissingPluginException {
+        // Platforms without an App Links implementation still use normal auth.
+      } on PlatformException catch (error) {
+        if (mounted) {
+          setState(() {
+            _googleAuthMessage =
+                'Could not read the Google sign-in callback. Please try again.';
+          });
+        }
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            library: 'Ginata Google sign-in',
+          ),
+        );
+      }
+      try {
+        _deepLinkSubscription = links.uriLinkStream.listen(
+          (uri) => unawaited(_handleGoogleCallback(uri)),
+          onError: (Object error) {
+            if (error is MissingPluginException ||
+                error is PlatformException ||
+                error is UnimplementedError) {
+              return;
+            }
+            FlutterError.reportError(
+              FlutterErrorDetails(
+                exception: error,
+                library: 'Ginata Google sign-in deep links',
+              ),
+            );
+          },
+        );
+      } on UnimplementedError {
+        // Platforms without an App Links stream still use normal auth.
+      } on MissingPluginException {
+        // Platforms without an App Links stream still use normal auth.
+      }
+    }
+    await _checkAuth();
   }
 
   Future<void> _checkAuth() async {
@@ -65,6 +122,27 @@ class _AppEntryPointState extends State<AppEntryPoint> {
     if (mounted) {
       setState(() => _sessionValidation = validation);
     }
+  }
+
+  Future<void> _handleGoogleCallback(Uri uri) async {
+    final result = await AuthService.handleGoogleCallback(uri);
+    if (result == null || !mounted) return;
+    if (result['success'] == true) {
+      await _checkAuth();
+    } else {
+      setState(() {
+        _googleAuthMessage =
+            result['message']?.toString() ??
+            'Google sign-in failed. Please try again.';
+        _sessionValidation = SessionValidation.invalid;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _deepLinkSubscription?.cancel();
+    super.dispose();
   }
 
   void _onSplashComplete() {
@@ -93,11 +171,14 @@ class _AppEntryPointState extends State<AppEntryPoint> {
 
     return switch (_sessionValidation!) {
       SessionValidation.valid => const MainNavigationShell(),
-      SessionValidation.invalid => LoginScreen(onLoginSuccess: _onLoginSuccess),
+      SessionValidation.invalid => LoginScreen(
+        onLoginSuccess: _onLoginSuccess,
+        googleAuthMessage: _googleAuthMessage,
+      ),
       SessionValidation.unavailable => ServerUnavailableScreen(
-          onRetry: _checkAuth,
-          onSignOut: _signOut,
-        ),
+        onRetry: _checkAuth,
+        onSignOut: _signOut,
+      ),
     };
   }
 }
@@ -149,9 +230,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(n.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                n.title,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               if (n.body.isNotEmpty)
-                Text(n.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                Text(
+                  n.body,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12),
+                ),
             ],
           ),
         ),
@@ -168,7 +257,10 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     NotificationCenter.instance.markRead(n);
     final type = n.entityType;
     if (type == 'google_form_response' || type == 'guest_form_submission') {
-      GuestFormsScreen.focusRequest.value = GuestRecordFocus(type!, n.entityId ?? '');
+      GuestFormsScreen.focusRequest.value = GuestRecordFocus(
+        type!,
+        n.entityId ?? '',
+      );
       setState(() => _currentIndex = 6);
     } else if (n.isGuestUpdate || type == 'guest_form') {
       setState(() => _currentIndex = 6);
@@ -185,7 +277,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       backgroundColor: Colors.white,
       builder: (ctx) => SafeArea(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          ),
           child: ListenableBuilder(
             listenable: center,
             builder: (ctx, _) => Column(
@@ -198,11 +292,18 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                       const Expanded(
                         child: Text(
                           'Notifications',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: GinataColors.primary),
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: GinataColors.primary,
+                          ),
                         ),
                       ),
                       if (center.unreadCount > 0)
-                        TextButton(onPressed: center.markAllRead, child: const Text('Mark all read')),
+                        TextButton(
+                          onPressed: center.markAllRead,
+                          child: const Text('Mark all read'),
+                        ),
                     ],
                   ),
                 ),
@@ -225,12 +326,21 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                         final n = center.recent[i];
                         return ListTile(
                           leading: Icon(
-                            n.kind == 'google_reconnect' ? Icons.link_off : Icons.how_to_reg_outlined,
-                            color: n.isRead ? GinataColors.textMuted : GinataColors.primary,
+                            n.kind == 'google_reconnect'
+                                ? Icons.link_off
+                                : Icons.how_to_reg_outlined,
+                            color: n.isRead
+                                ? GinataColors.textMuted
+                                : GinataColors.primary,
                           ),
                           title: Text(
                             n.title,
-                            style: TextStyle(fontWeight: n.isRead ? FontWeight.w500 : FontWeight.bold, fontSize: 14),
+                            style: TextStyle(
+                              fontWeight: n.isRead
+                                  ? FontWeight.w500
+                                  : FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                           subtitle: Text(
                             '${n.body}${n.body.isEmpty ? '' : '\n'}${_relativeTime(n.createdAt)}',
@@ -241,7 +351,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           isThreeLine: n.body.isNotEmpty,
                           trailing: n.isRead
                               ? null
-                              : const Icon(Icons.circle, size: 10, color: GinataColors.brassGold, semanticLabel: 'Unread'),
+                              : const Icon(
+                                  Icons.circle,
+                                  size: 10,
+                                  color: GinataColors.brassGold,
+                                  semanticLabel: 'Unread',
+                                ),
                           onTap: () {
                             Navigator.pop(ctx);
                             _openNotification(n);
@@ -298,7 +413,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
       ),
       builder: (ctx) => SafeArea(
         child: Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+          ),
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -319,12 +436,20 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   Image.asset(
                     'assets/images/brand_mark.png',
                     height: 22,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.villa, color: GinataColors.primary, size: 20),
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.villa,
+                      color: GinataColors.primary,
+                      size: 20,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   const Text(
                     'More Tools & Sections',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: GinataColors.primary),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: GinataColors.primary,
+                    ),
                   ),
                 ],
               ),
@@ -342,29 +467,86 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Badge(
-                          isLabelVisible: NotificationCenter.instance.unreadCount > 0,
-                          label: Text('${NotificationCenter.instance.unreadCount}'),
-                          child: const Icon(Icons.notifications_outlined, color: GinataColors.primary, size: 20),
+                          isLabelVisible:
+                              NotificationCenter.instance.unreadCount > 0,
+                          label: Text(
+                            '${NotificationCenter.instance.unreadCount}',
+                          ),
+                          child: const Icon(
+                            Icons.notifications_outlined,
+                            color: GinataColors.primary,
+                            size: 20,
+                          ),
                         ),
                       ),
                       title: const Text(
                         'Notifications',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: GinataColors.textPrimary),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: GinataColors.textPrimary,
+                        ),
                       ),
-                      subtitle: const Text('New guest check-ins and sync alerts', style: TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
-                      trailing: const Icon(Icons.chevron_right, size: 20, color: GinataColors.secondary),
+                      subtitle: const Text(
+                        'New guest check-ins and sync alerts',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: GinataColors.textSecondary,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        size: 20,
+                        color: GinataColors.secondary,
+                      ),
                       onTap: () {
                         Navigator.pop(ctx);
                         _showNotifications();
                       },
                     ),
                     const SizedBox(height: 8),
-                    _moreMenuItem(Icons.track_changes_outlined, 'Stay Tracker', 'Arrivals, departures, guests in-house & balances', 9, ctx),
-                    _moreMenuItem(Icons.account_balance_wallet_outlined, 'Finances & Expenses', 'Net profit, house expenses & cash collected', 4, ctx),
-                    _moreMenuItem(Icons.text_snippet_outlined, 'Message Templates', 'Pre-built guest messages for Airbnb & more', 5, ctx),
-                    _moreMenuItem(Icons.how_to_reg_outlined, 'Guest Check-ins', 'Google Forms sync & guest check-in review', 6, ctx),
-                    _moreMenuItem(Icons.receipt_long_outlined, 'Invoice Studio', 'Generate guest receipts, invoices & vouchers', 7, ctx),
-                    _moreMenuItem(Icons.person_outline, 'Host Profile & Settings', 'Edit host info, contacts, payout instructions', 8, ctx),
+                    _moreMenuItem(
+                      Icons.track_changes_outlined,
+                      'Stay Tracker',
+                      'Arrivals, departures, guests in-house & balances',
+                      9,
+                      ctx,
+                    ),
+                    _moreMenuItem(
+                      Icons.account_balance_wallet_outlined,
+                      'Finances & Expenses',
+                      'Net profit, house expenses & cash collected',
+                      4,
+                      ctx,
+                    ),
+                    _moreMenuItem(
+                      Icons.text_snippet_outlined,
+                      'Message Templates',
+                      'Pre-built guest messages for Airbnb & more',
+                      5,
+                      ctx,
+                    ),
+                    _moreMenuItem(
+                      Icons.how_to_reg_outlined,
+                      'Guest Check-ins',
+                      'Google Forms sync & guest check-in review',
+                      6,
+                      ctx,
+                    ),
+                    _moreMenuItem(
+                      Icons.receipt_long_outlined,
+                      'Invoice Studio',
+                      'Generate guest receipts, invoices & vouchers',
+                      7,
+                      ctx,
+                    ),
+                    _moreMenuItem(
+                      Icons.person_outline,
+                      'Host Profile & Settings',
+                      'Edit host info, contacts, payout instructions',
+                      8,
+                      ctx,
+                    ),
                     const SizedBox(height: 8),
                     ListTile(
                       leading: Container(
@@ -373,19 +555,35 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                           color: GinataColors.errorContainer,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.logout, color: GinataColors.alertTerracotta, size: 20),
+                        child: const Icon(
+                          Icons.logout,
+                          color: GinataColors.alertTerracotta,
+                          size: 20,
+                        ),
                       ),
                       title: const Text(
                         'Sign Out',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: GinataColors.alertTerracotta),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: GinataColors.alertTerracotta,
+                        ),
                       ),
-                      subtitle: const Text('End your session', style: TextStyle(fontSize: 11, color: GinataColors.textSecondary)),
+                      subtitle: const Text(
+                        'End your session',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: GinataColors.textSecondary,
+                        ),
+                      ),
                       onTap: () async {
                         Navigator.pop(ctx);
                         await AuthService.logout();
                         if (mounted) {
                           Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (_) => const AppEntryPoint()),
+                            MaterialPageRoute(
+                              builder: (_) => const AppEntryPoint(),
+                            ),
                             (route) => false,
                           );
                         }
@@ -401,12 +599,20 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _moreMenuItem(IconData icon, String title, String subtitle, int tabIndex, BuildContext ctx) {
+  Widget _moreMenuItem(
+    IconData icon,
+    String title,
+    String subtitle,
+    int tabIndex,
+    BuildContext ctx,
+  ) {
     final isSelected = _currentIndex == tabIndex;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isSelected ? GinataColors.secondaryContainer.withValues(alpha: 0.3) : GinataColors.surfaceSubdued,
+        color: isSelected
+            ? GinataColors.secondaryContainer.withValues(alpha: 0.3)
+            : GinataColors.surfaceSubdued,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isSelected ? GinataColors.primary : Colors.transparent,
@@ -420,7 +626,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             color: isSelected ? GinataColors.primary : Colors.white,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: isSelected ? Colors.white : GinataColors.primary, size: 20),
+          child: Icon(
+            icon,
+            color: isSelected ? Colors.white : GinataColors.primary,
+            size: 20,
+          ),
         ),
         title: Text(
           title,
@@ -432,9 +642,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(fontSize: 11, color: GinataColors.textSecondary),
+          style: const TextStyle(
+            fontSize: 11,
+            color: GinataColors.textSecondary,
+          ),
         ),
-        trailing: const Icon(Icons.chevron_right, size: 20, color: GinataColors.secondary),
+        trailing: const Icon(
+          Icons.chevron_right,
+          size: 20,
+          color: GinataColors.secondary,
+        ),
         onTap: () {
           Navigator.pop(ctx);
           setState(() => _currentIndex = tabIndex);
@@ -461,10 +678,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final isMoreSelected = _currentIndex >= 4;
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -481,9 +695,24 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             height: 58,
             child: Row(
               children: [
-                _buildNavItem(0, Icons.dashboard_outlined, Icons.dashboard, 'Home'),
-                _buildNavItem(1, Icons.domain_outlined, Icons.domain, 'Estates'),
-                _buildNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'Calendar'),
+                _buildNavItem(
+                  0,
+                  Icons.dashboard_outlined,
+                  Icons.dashboard,
+                  'Home',
+                ),
+                _buildNavItem(
+                  1,
+                  Icons.domain_outlined,
+                  Icons.domain,
+                  'Estates',
+                ),
+                _buildNavItem(
+                  2,
+                  Icons.calendar_month_outlined,
+                  Icons.calendar_month,
+                  'Calendar',
+                ),
                 _buildNavItem(3, Icons.hotel_outlined, Icons.hotel, 'Stays'),
                 _buildMoreNavItem(isMoreSelected),
               ],
@@ -494,7 +723,12 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData outlineIcon, IconData filledIcon, String label) {
+  Widget _buildNavItem(
+    int index,
+    IconData outlineIcon,
+    IconData filledIcon,
+    String label,
+  ) {
     final isSelected = _currentIndex == index;
     return Expanded(
       child: InkWell(
@@ -505,7 +739,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             Icon(
               isSelected ? filledIcon : outlineIcon,
               size: 22,
-              color: isSelected ? GinataColors.primary : GinataColors.textSecondary,
+              color: isSelected
+                  ? GinataColors.primary
+                  : GinataColors.textSecondary,
             ),
             const SizedBox(height: 3),
             Text(
@@ -513,7 +749,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? GinataColors.primary : GinataColors.textSecondary,
+                color: isSelected
+                    ? GinataColors.primary
+                    : GinataColors.textSecondary,
               ),
             ),
           ],
@@ -544,7 +782,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               child: Icon(
                 isSelected ? Icons.grid_view_rounded : Icons.grid_view_outlined,
                 size: 22,
-                color: isSelected ? GinataColors.primary : GinataColors.textSecondary,
+                color: isSelected
+                    ? GinataColors.primary
+                    : GinataColors.textSecondary,
               ),
             ),
             const SizedBox(height: 3),
@@ -553,7 +793,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? GinataColors.primary : GinataColors.textSecondary,
+                color: isSelected
+                    ? GinataColors.primary
+                    : GinataColors.textSecondary,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

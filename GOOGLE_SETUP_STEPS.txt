@@ -1,0 +1,224 @@
+GINATA GOOGLE SIGN-IN AND GOOGLE FORMS SETUP
+================================================
+
+This guide covers two separate Google features. Supabase handles the Flutter
+"Continue with Google" login using PKCE. Google Forms integration uses a
+separate FastAPI OAuth connection to read guest check-in responses.
+Email/password sign-in remains available.
+
+Important:
+- Never send or commit Google client secrets, Supabase service-role keys, or
+  generated encryption/signing secrets.
+- Do not put server secrets in Flutter build arguments or the web build.
+- Use a test Google account and a test form first.
+
+
+PART A - GOOGLE CLOUD PROJECT AND OAUTH CLIENT
+==============================================
+
+1. Open https://console.cloud.google.com/ and select the Google Cloud project
+   you will use for Ginata.
+
+2. Enable these APIs in APIs & Services > Library:
+   - Google Forms API
+   - Google Sheets API
+   - Google Drive API
+
+3. Configure the OAuth consent screen:
+   - Choose External if the test account is not part of your Google
+     Workspace organization.
+   - Enter the required app name, support email, and developer contact email.
+   - While testing, keep the app in Testing and add your Google account under
+     Test users.
+   - Request only the scopes required by Ginata. The Forms integration asks
+     for Forms, Sheets, and Drive access; Google may require verification
+     before broad public use.
+
+4. Open APIs & Services > Credentials > Create Credentials > OAuth client ID.
+   Choose Web application.
+
+5. Add BOTH of these as Authorized redirect URIs on that OAuth client:
+
+   Supabase Auth callback:
+   https://nwzivgrkvqynhfivvrlq.supabase.co/auth/v1/callback
+
+   Ginata Google Forms callback:
+   https://ginata-backend.onrender.com/api/v1/integrations/google/callback
+
+   These are Google-to-server callbacks. They are not the same as the URL
+   where a user ends up after login.
+
+6. Save the OAuth client. Keep its Client ID and Client Secret private. You
+   will enter them into Supabase and Render in the next sections.
+
+
+PART B - ENABLE GOOGLE AS A SUPABASE LOGIN PROVIDER
+===================================================
+
+This configures Supabase's Google provider for the Flutter PKCE login flow.
+
+1. Open the Supabase project whose URL is:
+   https://nwzivgrkvqynhfivvrlq.supabase.co
+
+2. Open Authentication > Sign In / Providers (may appear as Authentication >
+   Providers) > Google.
+
+3. Enable Google and enter the Google OAuth Web client ID and Client Secret
+   created in Part A. Save.
+
+4. In Authentication > URL Configuration > Redirect URLs, add the app
+   callback URLs you will use:
+
+   Android:
+   com.ginata.app://login-callback
+
+   Local web preview at 127.0.0.1:
+   http://127.0.0.1:8766/
+
+   Local web preview at localhost (only if you open it with localhost):
+   http://localhost:8766/
+
+   Production web app (add after deploying it):
+   https://<your-production-host>/
+
+   The production redirect must exactly match the browser URL, including its
+   path and trailing slash. Do not add the Google-to-Supabase callback here;
+   that callback belongs in Google Cloud's Authorized redirect URIs (Part A).
+
+
+PART C - CONFIGURE THE LIVE RENDER BACKEND
+=========================================
+
+1. In Supabase, open Project Settings > API (or API Keys). Copy:
+   - Project URL
+   - The anon/public key for this same project (sometimes labelled
+     publishable key)
+
+   Do NOT use the service_role/secret key as SUPABASE_ANON_KEY.
+
+2. Open the ginata-backend service in Render. Choose Environment and add or
+   update these variables. Do not add quotation marks around values:
+
+   SUPABASE_URL=https://nwzivgrkvqynhfivvrlq.supabase.co
+   SUPABASE_ANON_KEY=<anon-or-publishable-key-from-that-project>
+
+   Also set AUTH_REDIRECT_URLS to the comma-separated app callback URLs allowed
+   by the backend. For the Android app and local preview, use:
+
+   AUTH_REDIRECT_URLS=com.ginata.app://login-callback,http://127.0.0.1:8766/,http://localhost:8766/
+
+   When the web app is deployed, append its exact browser callback URL, for
+   example https://<your-production-host>/. Keep this list aligned with
+   Supabase Authentication > URL Configuration. Do not use a sample or
+   inactive domain as the production URL.
+
+3. Add the Google Forms integration settings. Use the same OAuth Web client
+   from Part A unless you intentionally created a separate Forms OAuth client.
+
+   GOOGLE_CLIENT_ID=<Google-OAuth-Web-client-ID>
+   GOOGLE_CLIENT_SECRET=<Google-OAuth-Web-client-secret>
+   GOOGLE_REDIRECT_URI=https://ginata-backend.onrender.com/api/v1/integrations/google/callback
+
+4. Generate the encryption and state-signing secrets on your own computer.
+   In PowerShell, run each command and paste its output directly into the
+   matching Render Environment value. Do not share the output or save it in
+   this repository.
+
+   Encryption key (URL-safe base64, 32 random bytes):
+   py -3 -c "import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
+
+   OAuth state signing secret (at least 32 random bytes):
+   py -3 -c "import secrets; print(secrets.token_urlsafe(48))"
+
+   Set:
+   GOOGLE_TOKEN_ENCRYPTION_KEY=<first-command-output>
+   GOOGLE_OAUTH_STATE_SECRET=<second-command-output>
+
+   Keep these values stable after users connect Google accounts. Replacing the
+   encryption key later will prevent Ginata from decrypting already-stored
+   Google refresh tokens; existing users may need to reconnect.
+
+5. Confirm GOOGLE_FORMS_POLL_SECONDS is a positive number (the default is 60).
+   Do not set it to 0; that disables automatic background polling.
+
+6. Save the Render environment changes and trigger a deploy/restart. Wait for
+   the deploy to finish successfully and inspect Render logs for startup errors.
+
+
+PART D - VERIFY CONFIGURATION WITHOUT CHANGING CUSTOMER DATA
+============================================================
+
+1. Open this URL:
+   https://ginata-backend.onrender.com/api/v1/auth/config
+
+   Expected after SUPABASE_URL and SUPABASE_ANON_KEY are set:
+   {"google_sign_in_enabled":true}
+
+   This only verifies those two values are non-empty. It does not prove that
+   the Supabase provider is enabled or that the provider credentials are valid.
+
+   Current live check: the endpoint reports Google sign-in enabled, and
+   authorize-url accepts com.ginata.app://login-callback. Render currently
+   rejects the tested local web callback with "This sign-in redirect is not
+   allowed". Add the exact local web URL(s) above to Render's
+   AUTH_REDIRECT_URLS before testing local web sign-in. A documented Vercel
+   sample host returned HTTP 404, so confirm the actual deployed host instead
+   of treating that example as production.
+
+2. To test Google sign-in to Ginata, open the Flutter app or web preview and
+   choose Continue with Google on either the Sign In or Create Account screen.
+   Complete the flow with the Google account registered as a consent-screen
+   test user. The app should return to Ginata and open the host dashboard.
+   If the Google email already belongs to an unverified password account, sign
+   in with that password first and verify the email before linking.
+
+3. To test Forms, first sign in to Ginata (email/password remains available)
+   and use Guest Check-ins > Connect Google account. In the Google screen:
+   - Sign in with the Google test user added to the consent screen.
+   - Review and approve the requested permissions.
+   - The browser should finish at the Ginata backend callback page saying
+     Google connected.
+   - Return to the Ginata app. The Guest Check-ins page should show the
+     connected Google account.
+
+4. Paste the edit URL of a TEST Google Form into Guest Check-ins and link it.
+   Use a form you control. Submit one harmless test response and wait for the
+   poller (normally up to about a minute), or use the page's Sync action.
+   Confirm the response appears in Ginata. Remove test data afterward if
+   appropriate.
+
+5. If connection fails, check:
+   - The Google Cloud OAuth client is Web application type.
+   - The Forms callback URI matches GOOGLE_REDIRECT_URI exactly, including
+     https, path, and trailing slash (there is no trailing slash here).
+   - The Google client ID and secret in Render belong to that OAuth client.
+   - Google Forms, Sheets, and Drive APIs are enabled.
+   - The Google account is listed as a consent-screen test user while the app
+     remains in Testing.
+   - GOOGLE_TOKEN_ENCRYPTION_KEY decodes to exactly 32 bytes and
+     GOOGLE_OAUTH_STATE_SECRET is at least 32 bytes.
+   - Render logs show the relevant callback error without exposing any secret.
+
+
+WHAT IS AND IS NOT ENABLED BY THESE STEPS
+========================================
+
+- SUPABASE_URL and SUPABASE_ANON_KEY make /api/v1/auth/config report that
+  Supabase Google sign-in is configured. The Flutter login and registration
+  screens use PKCE, open Supabase-hosted Google consent, handle web and Android
+  callbacks, exchange the code through FastAPI, and persist the Ginata session
+  returned by the backend.
+- GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI,
+  GOOGLE_TOKEN_ENCRYPTION_KEY, and GOOGLE_OAUTH_STATE_SECRET configure the
+  existing Google Forms account-connection OAuth used by Guest Check-ins.
+- Android's Gradle application ID is `com.ginata.app.ginata_app`. The OAuth
+  callback URI scheme is separately declared as
+  `com.ginata.app://login-callback` in the Android manifest; it does not have
+  to equal the package ID. This Supabase browser-PKCE flow uses the Google Web
+  OAuth client configured in Supabase; it does not require a Google Android
+  OAuth client or Android signing-certificate fingerprint.
+- FastAPI exchanges the Supabase authorization code and PKCE verifier, then
+  creates a Ginata session. Protected Ginata endpoints validate that opaque
+  Ginata bearer session against the server-side session table; do not send a
+  Supabase access token as the Ginata API bearer token.
+- Email/password authentication is separate and should continue to work.
