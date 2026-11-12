@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/ginata_theme.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../widgets/pdf_viewer.dart';
 
 class TemplateSettingsScreen extends StatefulWidget {
@@ -66,6 +67,7 @@ class _TemplateSettingsScreenState extends State<TemplateSettingsScreen> {
   bool _isSaving = false;
   bool _isApplying = false;
   bool _isPreviewing = false;
+  String? _settingsLoadError;
 
   @override
   void initState() {
@@ -98,7 +100,10 @@ class _TemplateSettingsScreenState extends State<TemplateSettingsScreen> {
   }
 
   Future<void> _loadProfileAndTemplate() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _settingsLoadError = null;
+    });
     try {
       final org = await ApiService.fetchOrganization();
       if (org != null) {
@@ -135,9 +140,116 @@ class _TemplateSettingsScreenState extends State<TemplateSettingsScreen> {
           _footerTextCtrl.text = tpl['footer_text'];
         }
       }
-    } catch (_) {}
+
+    } catch (e) {
+      _settingsLoadError = '$e';
+    }
     if (mounted) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _changePassword() async {
+    final formKey = GlobalKey<FormState>();
+    var currentPassword = '';
+    var newPassword = '';
+    var confirmPassword = '';
+    var busy = false;
+    String? error;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Change password'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    initialValue: currentPassword,
+                    obscureText: true,
+                    enabled: !busy,
+                    onChanged: (value) => currentPassword = value,
+                    decoration: const InputDecoration(labelText: 'Current password'),
+                    validator: (value) => value == null || value.isEmpty
+                        ? 'Enter your current password'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: newPassword,
+                    obscureText: true,
+                    enabled: !busy,
+                    onChanged: (value) => newPassword = value,
+                    decoration: const InputDecoration(labelText: 'New password'),
+                    validator: (value) => value == null || value.length < 10
+                        ? 'Use at least 10 characters'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: confirmPassword,
+                    obscureText: true,
+                    enabled: !busy,
+                    onChanged: (value) => confirmPassword = value,
+                    decoration: const InputDecoration(labelText: 'Confirm new password'),
+                    validator: (value) => value != newPassword
+                        ? 'Passwords do not match'
+                        : null,
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(error!, style: const TextStyle(color: GinataColors.alertTerracotta)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: busy ? null : () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setDialogState(() {
+                        busy = true;
+                        error = null;
+                      });
+                      final result = await AuthService.changePassword(
+                        currentPassword: currentPassword,
+                        newPassword: newPassword,
+                      );
+                      if (!ctx.mounted) return;
+                      if (result['success'] == true) {
+                        Navigator.pop(ctx, true);
+                      } else {
+                        setDialogState(() {
+                          busy = false;
+                          error = result['message']?.toString() ??
+                              'Could not change your password.';
+                        });
+                      }
+                    },
+              child: Text(busy ? 'Saving...' : 'Update password'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password updated. Other sessions have been signed out.'),
+          backgroundColor: GinataColors.primary,
+        ),
+      );
     }
   }
 
@@ -345,6 +457,35 @@ class _TemplateSettingsScreenState extends State<TemplateSettingsScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: GinataColors.primary),
             )
+          : _settingsLoadError != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, color: GinataColors.alertTerracotta, size: 36),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Could not load your settings.',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: GinataColors.textPrimary),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _settingsLoadError!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: GinataColors.textSecondary),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _loadProfileAndTemplate,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
               children: [
@@ -354,11 +495,38 @@ class _TemplateSettingsScreenState extends State<TemplateSettingsScreen> {
                 const SizedBox(height: 16),
                 _buildHostProfileCard(),
                 const SizedBox(height: 16),
+                _buildSecurityCard(),
+                const SizedBox(height: 16),
                 _buildDocumentDesignCard(),
                 const SizedBox(height: 16),
                 _buildApplyCard(),
               ],
             ),
+    );
+  }
+
+  Widget _buildSecurityCard() {
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabel('ACCOUNT SECURITY'),
+          const SizedBox(height: 6),
+          const Text(
+            'Update your sign-in password. Other active sessions will be revoked.',
+            style: TextStyle(fontSize: 12, color: GinataColors.textSecondary),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _changePassword,
+              icon: const Icon(Icons.lock_reset_outlined),
+              label: const Text('Change password'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

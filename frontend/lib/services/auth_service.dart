@@ -9,6 +9,7 @@ enum SessionValidation { valid, invalid, unavailable }
 
 class AuthService {
   static String get _baseUrl => ApiService.baseUrl;
+  static http.Client client = http.Client();
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   static const String _defaultOrgId = 'org-ginata-prime';
 
@@ -142,6 +143,79 @@ class AuthService {
       }
     }
     return {'success': false, 'message': detail is String ? detail : fallback};
+  }
+
+  static Future<Map<String, dynamic>> requestPasswordReset(String email) async {
+    try {
+      final response = await client.post(
+        Uri.parse('$_baseUrl/auth/password/forgot'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email.trim().toLowerCase()}),
+      ).timeout(const Duration(seconds: 45));
+      final body = _decodeBody(response);
+      if (response.statusCode == 200) return body;
+      return _responseError(response, 'Could not request a password reset.');
+    } catch (error) {
+      return _requestFailure('request a password reset', error);
+    }
+  }
+
+  static Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    if (newPassword.length < 10) {
+      return {'success': false, 'message': 'Password must be at least 10 characters.'};
+    }
+    try {
+      final response = await client.post(
+        Uri.parse('$_baseUrl/auth/password/reset'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email.trim().toLowerCase(),
+          'code': code.trim(),
+          'new_password': newPassword,
+        }),
+      ).timeout(const Duration(seconds: 45));
+      final body = _decodeBody(response);
+      if (response.statusCode == 200) return body;
+      return _responseError(response, 'Could not reset your password.');
+    } catch (error) {
+      return _requestFailure('reset your password', error);
+    }
+  }
+
+  static Future<Map<String, dynamic>> changePassword({
+    String? currentPassword,
+    required String newPassword,
+  }) async {
+    if (newPassword.length < 10) {
+      return {'success': false, 'message': 'Password must be at least 10 characters.'};
+    }
+    try {
+      final token = await getToken();
+      if (token.isEmpty) {
+        return {'success': false, 'message': 'Your session has expired. Sign in again.'};
+      }
+      final response = await client.post(
+        Uri.parse('$_baseUrl/auth/password/change'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          if (currentPassword != null && currentPassword.isNotEmpty)
+            'current_password': currentPassword,
+          'new_password': newPassword,
+        }),
+      ).timeout(const Duration(seconds: 45));
+      final body = _decodeBody(response);
+      if (response.statusCode == 200) return body;
+      return _responseError(response, 'Could not change your password.');
+    } catch (error) {
+      return _requestFailure('change your password', error);
+    }
   }
 
   static Future<Map<String, dynamic>> _acceptSession(Map<String, dynamic> body) async {

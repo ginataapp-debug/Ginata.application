@@ -118,6 +118,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           _showError(res['message'] ?? 'Unable to create account.');
         }
       }
+
     } catch (e) {
       if (!mounted) return;
       _showError('Connection error. Please try again.');
@@ -215,6 +216,21 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       host: (result['host'] as Map<String, dynamic>?) ?? {},
       message: result['message']?.toString() ?? 'Email confirmed.',
       isNewAccount: isNewAccount,
+    );
+  }
+
+  Future<void> _showPasswordReset() async {
+    final resetEmail = await showDialog<String>(
+      context: context,
+      builder: (_) => _PasswordResetDialog(initialEmail: _emailController.text.trim()),
+    );
+    if (!mounted || resetEmail == null) return;
+    _emailController.text = resetEmail;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Password updated. Sign in with your new password.'),
+        backgroundColor: GinataColors.primary,
+      ),
     );
   }
 
@@ -562,6 +578,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             ),
             const SizedBox(height: 14),
 
+            if (_authMode == 0)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isLoading ? null : _showPasswordReset,
+                  child: const Text('Forgot password?'),
+                ),
+              ),
+
             if (_authMode == 1) ...[
               // Phone
               TextFormField(
@@ -678,4 +703,169 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       ],
     );
   }
+}
+
+class _PasswordResetDialog extends StatefulWidget {
+  const _PasswordResetDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_PasswordResetDialog> createState() => _PasswordResetDialogState();
+}
+
+class _PasswordResetDialogState extends State<_PasswordResetDialog> {
+  late final TextEditingController _emailController;
+  final _codeController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  var _busy = false;
+  var _codeSent = false;
+  String? _error;
+  String? _notice;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _codeController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestCode() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'Enter a valid account email.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final response = await AuthService.requestPasswordReset(email);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (response['success'] == true) {
+        _codeSent = true;
+        _notice = response['message']?.toString() ??
+            'If an account exists for that email, a reset code has been sent.';
+      } else {
+        _error = response['message']?.toString() ?? 'Could not request a reset code.';
+      }
+    });
+  }
+
+  Future<void> _resetPassword() async {
+    if (!RegExp(r'^[0-9]{6}$').hasMatch(_codeController.text)) {
+      setState(() => _error = 'Enter the six-digit reset code.');
+      return;
+    }
+    if (_passwordController.text.length < 10) {
+      setState(() => _error = 'Password must be at least 10 characters.');
+      return;
+    }
+    if (_passwordController.text != _confirmController.text) {
+      setState(() => _error = 'Passwords do not match.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final response = await AuthService.resetPassword(
+      email: _emailController.text,
+      code: _codeController.text,
+      newPassword: _passwordController.text,
+    );
+    if (!mounted) return;
+    if (response['success'] == true) {
+      Navigator.pop(context, _emailController.text.trim());
+    } else {
+      setState(() {
+        _busy = false;
+        _error = response['message']?.toString() ?? 'Could not reset your password.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Reset your password'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('We’ll email a one-time reset code if this account exists.'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _emailController,
+                enabled: !_busy,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Account email'),
+              ),
+              if (_codeSent) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _codeController,
+                  enabled: !_busy,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(6),
+                  ],
+                  decoration: const InputDecoration(labelText: 'Six-digit reset code'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _passwordController,
+                  enabled: !_busy,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'New password'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _confirmController,
+                  enabled: !_busy,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Confirm new password'),
+                ),
+              ],
+              if (_notice != null) ...[
+                const SizedBox(height: 12),
+                Text(_notice!, style: const TextStyle(color: GinataColors.secondary)),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 12),
+                Text(_error!, style: const TextStyle(color: GinataColors.alertTerracotta)),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _busy ? null : _requestCode,
+            child: Text(_codeSent ? 'Resend code' : 'Send code'),
+          ),
+          if (_codeSent)
+            ElevatedButton(
+              onPressed: _busy ? null : _resetPassword,
+              child: Text(_busy ? 'Please wait...' : 'Reset password'),
+            ),
+        ],
+      );
 }

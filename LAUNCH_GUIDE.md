@@ -95,7 +95,7 @@ The root endpoint must return HTTP 200. In the OpenAPI paths, confirm that these
 release routes are present before installing the updated clients:
 
 - `/api/v1/auth/config`
-- `/api/v1/auth/password/forgot` and `/api/v1/auth/password/reset`
+- `/api/v1/auth/password/forgot`, `/api/v1/auth/password/reset`, and `/api/v1/auth/password/change`
 - `/api/v1/auth/account/delete`
 - `/api/v1/subscription`
 - `/api/v1/tasks` and `/api/v1/tasks/today`
@@ -163,7 +163,7 @@ enabled and Android Platform Tools installed:
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
-The release is version `1.0.1` (version code `2`) so it can update the previous
+The release is version `1.0.1` (version code `3`) so it can update the previous
 `1.0.0` installation. Sign in with a test host, verify email confirmation, then
 exercise the same booking, guest, operations, finance, and document flows as the
 web app. A store release requires the private upload keystore and a Play App
