@@ -1,0 +1,222 @@
+GINATA PRODUCTION LAUNCH CHECKLIST
+==================================
+
+Checked: 2026-11-13
+Production web app: https://123159d9.ginata-application.pages.dev/app/
+Render API: https://ginata-backend.onrender.com
+Supabase project: https://nwzivgrkvqynhfivvrlq.supabase.co
+GitHub repository: https://github.com/ginataapp-debug/Ginata.application
+
+IMPORTANT STATUS
+----------------
+The API root responds as operational and /api/v1/auth/config currently reports
+Google sign-in enabled. This only proves the backend has Supabase URL and public
+key values; it does not prove that the Google provider is correctly configured.
+
+Production checks found two blockers:
+1. POST /api/v1/auth/google/authorize-url rejects the actual web callback
+   https://123159d9.ginata-application.pages.dev/app/ with HTTP 400:
+   "This sign-in redirect is not allowed".
+2. A CORS preflight from https://123159d9.ginata-application.pages.dev does not
+   receive an allow-origin response.
+
+The code defaults have been corrected for these production URLs, and CORS is
+restricted to the required methods and headers. Render environment variables
+override those defaults, so the Render values below must still be saved and a
+backend deployment completed.
+
+The changes are committed locally as a7ae6c3, after 0aa5cd0. The GitHub push
+was rejected with HTTP 403 for the authenticated account xjijou. Therefore the
+latest changes are NOT on GitHub, Cloudflare Pages, or Render yet. Add xjijou
+with Write access to the repository (and accept the invitation), or push the
+commits from an account that has write access.
+
+1. DEPLOY THE COMMITTED CHANGES
+-------------------------------
+1. Grant the GitHub account xjijou Write access to ginataapp-debug/Ginata.application
+   and accept the invitation, or authenticate Git with an account that can push.
+2. Push the main branch, including commit a7ae6c3.
+3. Wait for the linked Cloudflare Pages and Render deployments to finish. If
+   either service is not linked to this repository, deploy main manually.
+4. Do not treat this local APK or web build as the live deployment. The local
+   web build is in frontend/build/cloudflare-pages and the APK is in
+   frontend/build/app/outputs/flutter-apk/app-release.apk.
+
+2. CLOUDFLARE PAGES
+-------------------
+This repository builds one combined Pages site: the marketing site at / and
+the Flutter app at /app/. Use:
+
+  Production branch: main
+  Root directory: /
+  Build command: bash frontend/scripts/build_cloudflare.sh
+  Output directory: frontend/build/cloudflare-pages
+
+The script pins Flutter, builds with
+API_URL=https://ginata-backend.onrender.com/api/v1, and sets /app/ as the app
+base path. It does not publish an APK. Test both the root site and /app/ after
+deployment, including a direct refresh at /app/.
+
+The frontend already uses the production API base URL by default and the
+Cloudflare build script explicitly sets it. No localhost or 127.0.0.1 API
+addresses were found in the Flutter production sources.
+
+3. RENDER ENVIRONMENT
+---------------------
+In Render > ginata-backend > Environment, set the following non-secret values
+exactly. Preserve any other required callback URLs (for example Android) when
+replacing a comma-separated variable:
+
+  CORS_ALLOWED_ORIGINS=https://123159d9.ginata-application.pages.dev
+  CORS_ALLOWED_ORIGIN_REGEX=
+  AUTH_REDIRECT_URLS=com.ginata.app://login-callback,https://123159d9.ginata-application.pages.dev/app/
+  PUBLIC_API_BASE_URL=https://ginata-backend.onrender.com
+  GOOGLE_REDIRECT_URI=https://ginata-backend.onrender.com/api/v1/integrations/google/callback
+
+The empty origin regex disables regex-matched origins in production. Do not use
+* for CORS. The backend now permits GET, POST, PUT, PATCH, DELETE and OPTIONS;
+only Accept, Authorization and Content-Type request headers are allowed.
+
+Keep the existing private variables in Render only, never Cloudflare or Flutter:
+  DATABASE_URL
+  SECRET_KEY
+  SUPABASE_URL
+  SUPABASE_ANON_KEY
+  SUPABASE_SERVICE_ROLE_KEY (only if needed for account deletion or backend
+  storage; never expose it to the browser)
+  GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET (used by the separate Google Forms
+  integration, not required for the Supabase Google sign-in flow)
+  SMTP and Google Forms encryption/state secrets used by enabled features
+
+Do not paste secret values into GitHub, this file, Flutter defines, or chat.
+Confirm the database URL uses Supabase PostgreSQL and that the Render service
+has the expected current secrets by checking variable names and service logs;
+never print the values. The public API health response does not prove which
+database Render is connected to.
+
+After saving environment variables, deploy/restart Render. Then verify:
+  GET https://ginata-backend.onrender.com/api/v1/auth/config
+  POST https://ginata-backend.onrender.com/api/v1/auth/google/authorize-url
+with redirect_to set to
+  https://123159d9.ginata-application.pages.dev/app/
+and a valid 43-character S256 PKCE challenge. The second request must return
+200 and a Supabase authorize URL. Also verify the CORS preflight from the
+production Pages origin returns the matching Access-Control-Allow-Origin.
+
+4. SUPABASE AND GOOGLE SIGN-IN
+-----------------------------
+In the Supabase project whose reference is nwzivgrkvqynhfivvrlq:
+
+1. Authentication > Providers > Google: enable Google and verify its web
+   OAuth client ID and secret are the intended credentials.
+2. In Google Cloud, set this Authorized redirect URI on that OAuth client:
+   https://nwzivgrkvqynhfivvrlq.supabase.co/auth/v1/callback
+3. Authentication > URL Configuration:
+   Site URL: https://123159d9.ginata-application.pages.dev
+   Redirect URL: https://123159d9.ginata-application.pages.dev/app/
+   Keep com.ginata.app://login-callback for Android if Android is in use.
+4. Keep these separate: the Google-to-Supabase callback above is not the
+   Flutter app callback. Google Forms uses the Render callback in section 3.
+5. Test a real sign-in in a browser. Confirm the app reaches an authenticated
+   dashboard, refreshes while still authenticated, then log out and sign in
+   again. Also test cancellation and a rejected/expired callback.
+
+The implementation uses Supabase OAuth PKCE to validate a Google identity,
+then Ginata issues its own opaque host-session token. It does not currently
+retain a Supabase browser session or send Supabase JWTs to protected API routes.
+The backend validates Ginata host-session records, not Supabase JWT signatures.
+Changing this to Supabase JWT authentication is an architecture migration and
+must preserve email/password and tenant isolation; it is not silently claimed
+as completed here.
+
+5. DATABASE, TENANT ACCESS, AND STORAGE
+---------------------------------------
+The backend has SQLAlchemy models, startup table creation, and additive
+migrations. Its PostgreSQL migration enables RLS and revokes direct anon and
+authenticated table grants on tables owned by the database connection. The API
+uses the database connection and derives organization scope from the logged-in
+Ginata host. Automated tenant-boundary tests pass.
+
+Still verify in the Supabase dashboard that Render DATABASE_URL points to this
+project, the migrations completed, expected tables and foreign keys exist, and
+the RLS/grants are present. Do not manually add broad RLS policies without
+testing how the API database role is affected. Test two distinct production
+hosts and confirm neither can access the other's records.
+
+Current storage behavior:
+- Property/brand images use the ginata-media Supabase bucket when backend
+  service-role storage credentials are configured; otherwise they fall back
+  to Render local disk.
+- Generated invoices, receipts, and other documents are written to backend
+  local storage and downloaded through organization-scoped API routes.
+- Private-bucket policies, persistent document storage, signed URLs, and
+  cross-host storage access have not been verified. Render local disk is not a
+  substitute for durable private object storage.
+
+Before storing sensitive guest IDs, move document storage to a durable private
+bucket, enforce host/property ownership in backend operations, use short-lived
+signed downloads, and test cross-host denial. Restrict uploads to documented
+file types and sizes.
+
+6. AUTHENTICATION AND ACCOUNT WORKFLOW
+--------------------------------------
+Existing email/password signup, login, reset, logout, and Google PKCE flows are
+preserved. API calls use the production HTTPS API URL, existing request timeout
+handling, and session validation. A 401 now clears the Ginata session and sends
+the app back to sign-in. The login screen places "Forgot password?" below the
+password field.
+
+Backend automated tests include tenant boundary checks; they do not prove live
+production account workflows. After deploying, test registration, verification
+if enabled, login, logout, reset email delivery, session expiry, profile edits,
+property/booking/finance/document workflows, and persistence after re-login
+with two separate accounts. Confirm no secrets are returned in API errors.
+
+7. SUBSCRIPTIONS AND PAYMENTS
+-----------------------------
+The current subscription feature is a trial/plan status model with an
+administrator update endpoint. No payment checkout, payment verification,
+provider webhook, idempotency ledger, paid-feature payment gate, or complete
+billing history has been verified. Do not collect real payments.
+
+For Kenya, shortlist Pesapal first for local M-Pesa plus card collection, with
+Flutterwave as an alternative to compare. Get current written KES pricing and
+settlement terms directly from each provider; fees can vary by payment rail,
+card type, business contract, taxes, and settlement terms. Do not publish a
+guessed fee. Require the provider to confirm whether recurring tokenized card
+billing is available for this account; do not assume M-Pesa supports automatic
+recurring charges. A customer-approved M-Pesa push per billing period may be
+needed. Before production, implement sandbox checkout, server-side payment
+verification, signed webhook verification, idempotency, cancellation/expiry
+logic, receipts, and backend entitlement enforcement. Test the sandbox and
+webhooks before enabling live credentials.
+
+8. GOOGLE FORMS
+---------------
+Google Forms authorization is a separate backend integration. Its callback is:
+https://ginata-backend.onrender.com/api/v1/integrations/google/callback
+
+The backend stores host-specific encrypted refresh tokens and verifies OAuth
+state. The Render root health response reports the Google Forms poller running.
+Verify the Google Cloud client has this callback, required scopes are approved,
+token-encryption and state secrets exist in Render, and two hosts cannot access
+one another's integration. Do not change this callback to the Cloudflare URL.
+
+9. VERIFICATION ALREADY RUN
+---------------------------
+- Flutter tests: 19 passed.
+- Flutter analyzer: no issues.
+- Backend tests: 60 passed.
+- Production API root: operational at the time checked.
+- Production auth config: Google flag true at the time checked.
+- Production OAuth URL start: failed because the deployed redirect allow-list
+  rejected the Pages callback.
+- Production CORS: the Pages origin was not allowed at the time checked.
+- Local production-mode Flutter web build: succeeded; login screen and the
+  forgot-password link below the password field were visually checked.
+- Release APK build: succeeded. This does not test on a physical Android
+  device or complete a real Google OAuth flow.
+
+The production Google provider settings, Render secrets/database target,
+Supabase RLS/storage policies, real multi-host behavior, actual Google sign-in,
+and payment transactions still require the account-side checks above.
