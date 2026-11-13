@@ -9,38 +9,29 @@ GitHub repository: https://github.com/ginataapp-debug/Ginata.application
 
 IMPORTANT STATUS
 ----------------
-The API root responds as operational and /api/v1/auth/config currently reports
-Google sign-in enabled. This only proves the backend has Supabase URL and public
-key values; it does not prove that the Google provider is correctly configured.
+The API root and auth config respond successfully. Live checks on 2026-11-13
+also confirmed:
+- The marketing homepage and /app/ both return HTTP 200.
+- A production-origin CORS preflight returns the matching
+  Access-Control-Allow-Origin header.
+- POST /api/v1/auth/google/authorize-url accepts the production /app/ callback
+  and returns a Supabase authorization URL. This does not prove a real Google
+  sign-in will complete.
+- A password-recovery request for a synthetic address returned the generic
+  success response. That response intentionally does not prove an email was
+  delivered, and does not establish that Render is running the latest code.
 
-Production checks found two blockers:
-1. POST /api/v1/auth/google/authorize-url rejects the actual web callback
-   https://123159d9.ginata-application.pages.dev/app/ with HTTP 400:
-   "This sign-in redirect is not allowed".
-2. A CORS preflight from https://123159d9.ginata-application.pages.dev does not
-   receive an allow-origin response.
-
-The code defaults have been corrected for these production URLs, and CORS is
-restricted to the required methods and headers. Render environment variables
-override those defaults, so the Render values below must still be saved and a
-backend deployment completed.
-
-The changes are committed locally as a7ae6c3, after 0aa5cd0. The GitHub push
-was rejected with HTTP 403 for the authenticated account xjijou. Therefore the
-latest changes are NOT on GitHub, Cloudflare Pages, or Render yet. Add xjijou
-with Write access to the repository (and accept the invitation), or push the
-commits from an account that has write access.
+Commit de2f154 is pushed to the existing GitHub main branch. Render's deployment
+of this commit and delivery of a reset code to a real test mailbox still need
+verification. Never use a real user's password or email for deployment probes.
 
 1. DEPLOY THE COMMITTED CHANGES
 -------------------------------
-1. Grant the GitHub account xjijou Write access to ginataapp-debug/Ginata.application
-   and accept the invitation, or authenticate Git with an account that can push.
-2. Push the main branch, including commit a7ae6c3.
-3. Wait for the linked Cloudflare Pages and Render deployments to finish. If
-   either service is not linked to this repository, deploy main manually.
-4. Do not treat this local APK or web build as the live deployment. The local
-   web build is in frontend/build/cloudflare-pages and the APK is in
-   frontend/build/app/outputs/flutter-apk/app-release.apk.
+Commit de2f154, which fixes password recovery configuration reporting and
+verifies login after a successful reset, is pushed to the existing main branch.
+Confirm the Render service deploys this commit before treating the backend fix
+as live. The push does not change the Cloudflare frontend. Do not treat the
+local APK or web build as a production deployment.
 
 2. CLOUDFLARE PAGES
 -------------------
@@ -164,13 +155,19 @@ Existing email/password signup, login, reset, logout, and Google PKCE flows are
 preserved. API calls use the production HTTPS API URL, existing request timeout
 handling, and session validation. A 401 now clears the Ginata session and sends
 the app back to sign-in. The login screen places "Forgot password?" below the
-password field.
+password field. Password recovery requires SMTP_HOST and SMTP_FROM_EMAIL plus
+secure transport (SMTP_STARTTLS or SMTP_USE_SSL) in the backend environment.
+Without that configuration, recovery now returns HTTP 503 rather than claiming
+that a code was sent. Provider delivery failures retain a generic response to
+avoid revealing whether an email belongs to an account; verify the provider
+configuration and test delivery to a real controlled mailbox.
 
 Backend automated tests include tenant boundary checks; they do not prove live
 production account workflows. After deploying, test registration, verification
-if enabled, login, logout, reset email delivery, session expiry, profile edits,
-property/booking/finance/document workflows, and persistence after re-login
-with two separate accounts. Confirm no secrets are returned in API errors.
+if enabled, login, logout, reset email delivery and login with the new password,
+session expiry, profile edits, property/booking/finance/document workflows,
+and persistence after re-login with two separate accounts. Confirm no secrets
+are returned in API errors.
 
 7. SUBSCRIPTIONS AND PAYMENTS
 -----------------------------
@@ -204,18 +201,19 @@ one another's integration. Do not change this callback to the Cloudflare URL.
 
 9. VERIFICATION ALREADY RUN
 ---------------------------
-- Flutter tests: 19 passed.
+- Flutter tests: 21 passed.
 - Flutter analyzer: no issues.
-- Backend tests: 60 passed.
-- Production API root: operational at the time checked.
-- Production auth config: Google flag true at the time checked.
-- Production OAuth URL start: failed because the deployed redirect allow-list
-  rejected the Pages callback.
-- Production CORS: the Pages origin was not allowed at the time checked.
+- Backend tests: 61 passed.
+- Production API root: HTTP 200.
+- Production auth config: Google flag true.
+- Production OAuth URL start: HTTP 200 for the production Pages callback.
+- Production CORS preflight: HTTP 200 with the Pages origin allowed.
+- Production password-recovery probe: generic HTTP 200 for a synthetic address;
+  actual email delivery and the deployed backend commit are not verified.
 - Local production-mode Flutter web build: succeeded; login screen and the
   forgot-password link below the password field were visually checked.
-- Release APK build: succeeded. This does not test on a physical Android
-  device or complete a real Google OAuth flow.
+- Release APK build: succeeded and APK v2 signature verified. This does not
+  test on a physical Android device or complete a real Google OAuth flow.
 
 The production Google provider settings, Render secrets/database target,
 Supabase RLS/storage policies, real multi-host behavior, actual Google sign-in,
