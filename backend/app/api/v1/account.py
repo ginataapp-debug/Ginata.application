@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.api.deps import get_current_host, bearer_scheme
 from backend.app.api.v1.auth import _now, _issue_session, _response, _create_default_template, _send_verification_email
-from backend.app.core.config import settings
+from backend.app.core.config import _normalize_redirect_url, settings
 from backend.app.core.database import Base, get_db
 from backend.app.core.rate_limit import limit_auth_requests
 from backend.app.core.security import hash_password, verify_password, hash_auth_token
@@ -65,9 +65,10 @@ def auth_config():
 def authorize_google(req: GoogleAuthorize):
     if not settings.SUPABASE_URL or not settings.SUPABASE_ANON_KEY:
         raise HTTPException(503, "Google sign-in is not configured yet")
-    if req.redirect_to not in settings.AUTH_REDIRECT_URLS:
+    redirect_to = _normalize_redirect_url(req.redirect_to)
+    if redirect_to not in settings.AUTH_REDIRECT_URLS:
         raise HTTPException(400, "This sign-in redirect is not allowed")
-    return {"url": f"{settings.SUPABASE_URL}/auth/v1/authorize?" + urlencode({"provider": "google", "redirect_to": req.redirect_to, "code_challenge": req.code_challenge, "code_challenge_method": "s256"})}
+    return {"url": f"{settings.SUPABASE_URL}/auth/v1/authorize?" + urlencode({"provider": "google", "redirect_to": redirect_to, "code_challenge": req.code_challenge, "code_challenge_method": "s256"})}
 
 
 @router.post("/google", response_model=HostAuthResponse)

@@ -1,8 +1,22 @@
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
+
 from pydantic import BaseModel, Field
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+def _normalize_redirect_url(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return value
+    parsed = urlsplit(value)
+    normalized = value.rstrip("/")
+    if parsed.scheme and parsed.netloc and parsed.path in ("", "/"):
+        return normalized.rstrip("/")
+    return normalized
+
 
 class Settings(BaseModel):
     PROJECT_NAME: str = "Ginata Property Management"
@@ -36,7 +50,14 @@ class Settings(BaseModel):
     ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
     SUBSCRIPTION_GRANDFATHER_BEFORE: str = os.getenv("SUBSCRIPTION_GRANDFATHER_BEFORE", "2026-11-13")
     PUBLIC_API_BASE_URL: str = os.getenv("PUBLIC_API_BASE_URL", "https://ginata-backend.onrender.com").rstrip("/")
-    AUTH_REDIRECT_URLS: list[str] = [value.strip() for value in os.getenv("AUTH_REDIRECT_URLS", "com.ginata.app://login-callback,https://123159d9.ginata-application.pages.dev/app/,http://localhost:3000/app/,http://127.0.0.1:3000/app/").split(",") if value.strip()]
+    AUTH_REDIRECT_URLS: list[str] = [
+        _normalize_redirect_url(value)
+        for value in os.getenv(
+            "AUTH_REDIRECT_URLS",
+            "com.ginata.app://login-callback,https://123159d9.ginata-application.pages.dev/app/,http://localhost:3000/app/,http://127.0.0.1:3000/app/",
+        ).split(",")
+        if value.strip()
+    ]
     RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
     TRIAL_DAYS: int = Field(default=int(os.getenv("TRIAL_DAYS", "14")), ge=1, le=90)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
