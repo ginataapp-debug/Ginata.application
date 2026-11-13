@@ -30,14 +30,14 @@ app = FastAPI(
     description="Ginata Property Management Backend - Source of Truth for Confirmed Bookings, Invoices, and Guest Information"
 )
 
-# Enable CORS for Flutter Web, Desktop, and Local dev
+# Enable CORS for the production Flutter Web app and local development.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ALLOWED_ORIGINS,
     allow_origin_regex=settings.CORS_ALLOWED_ORIGIN_REGEX or None,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Accept", "Authorization", "Content-Type"],
 )
 
 # Static and Uploads mounts

@@ -39,6 +39,12 @@ def test_google_config_authorize_and_new_account(platform_env, monkeypatch):
     response = client.post("/api/v1/auth/google/authorize-url", json={"redirect_to": "com.ginata.app://login-callback", "code_challenge": "a" * 43})
     assert response.status_code == 200
     assert "code_challenge_method=s256" in response.json()["url"]
+    production_redirect = "https://123159d9.ginata-application.pages.dev/app/"
+    production_response = client.post(
+        "/api/v1/auth/google/authorize-url",
+        json={"redirect_to": production_redirect, "code_challenge": "a" * 43},
+    )
+    assert production_response.status_code == 200
     assert client.post("/api/v1/auth/google/authorize-url", json={"redirect_to": "https://evil.example.test", "code_challenge": "a" * 43}).status_code == 400
     created = client.post("/api/v1/auth/google", json=GOOGLE_BODY)
     assert created.status_code == 200, created.text

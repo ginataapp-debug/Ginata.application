@@ -62,6 +62,13 @@ void main() {
     expect(find.text('Create Account'), findsOneWidget);
     expect(find.text('Continue with Google'), findsOneWidget);
     expect(find.byType(TextFormField), findsNWidgets(2));
+    final passwordField = tester.getCenter(
+      find.widgetWithText(TextFormField, 'Password *'),
+    );
+    final forgotPasswordLink = tester.getCenter(
+      find.text('Forgot password?'),
+    );
+    expect(forgotPasswordLink.dy, greaterThan(passwordField.dy));
     await tester.tap(find.text('Create Account'));
     await tester.pumpAndSettle();
     expect(find.text('Continue with Google'), findsOneWidget);

@@ -36,7 +36,7 @@ class Settings(BaseModel):
     ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
     SUBSCRIPTION_GRANDFATHER_BEFORE: str = os.getenv("SUBSCRIPTION_GRANDFATHER_BEFORE", "2026-11-13")
     PUBLIC_API_BASE_URL: str = os.getenv("PUBLIC_API_BASE_URL", "https://ginata-backend.onrender.com").rstrip("/")
-    AUTH_REDIRECT_URLS: list[str] = [value.strip() for value in os.getenv("AUTH_REDIRECT_URLS", "com.ginata.app://login-callback,http://localhost:3000/app/,http://127.0.0.1:3000/app/").split(",") if value.strip()]
+    AUTH_REDIRECT_URLS: list[str] = [value.strip() for value in os.getenv("AUTH_REDIRECT_URLS", "com.ginata.app://login-callback,https://123159d9.ginata-application.pages.dev/app/,http://localhost:3000/app/,http://127.0.0.1:3000/app/").split(",") if value.strip()]
     RATE_LIMIT_ENABLED: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
     TRIAL_DAYS: int = Field(default=int(os.getenv("TRIAL_DAYS", "14")), ge=1, le=90)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -57,7 +57,7 @@ class Settings(BaseModel):
     CORS_ALLOWED_ORIGINS: list[str] = [
         origin.strip().rstrip("/")
         for origin in os.getenv(
-            "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080"
+            "CORS_ALLOWED_ORIGINS", "https://123159d9.ginata-application.pages.dev,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080"
         ).split(",") if origin.strip() and origin.strip() != "*"
     ]
     CORS_ALLOWED_ORIGIN_REGEX: str = os.getenv(

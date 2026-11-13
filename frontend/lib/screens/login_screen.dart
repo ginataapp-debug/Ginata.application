@@ -1202,15 +1202,6 @@ class _LoginScreenState extends State<LoginScreen>
             ),
             const SizedBox(height: 14),
 
-            if (_authMode == 0)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _isLoading ? null : _showPasswordReset,
-                  child: const Text('Forgot password?'),
-                ),
-              ),
-
             if (_authMode == 1) ...[
               // Phone
               TextFormField(
@@ -1261,6 +1252,16 @@ class _LoginScreenState extends State<LoginScreen>
                 return null;
               },
             ),
+
+            if (_authMode == 0) ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isLoading ? null : _showPasswordReset,
+                  child: const Text('Forgot password?'),
+                ),
+              ),
+            ],
 
             if (_authMode == 1) ...[
               const SizedBox(height: 14),

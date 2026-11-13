@@ -58,7 +58,15 @@ class _AppEntryPointState extends State<AppEntryPoint> {
   @override
   void initState() {
     super.initState();
+    ApiService.onUnauthorized = _handleUnauthorized;
     _initializeAuth();
+  }
+
+  Future<void> _handleUnauthorized() async {
+    await AuthService.logout();
+    if (mounted) {
+      setState(() => _sessionValidation = SessionValidation.invalid);
+    }
   }
 
   Future<void> _initializeAuth() async {
@@ -156,6 +164,7 @@ class _AppEntryPointState extends State<AppEntryPoint> {
 
   @override
   void dispose() {
+    ApiService.onUnauthorized = null;
     _deepLinkSubscription?.cancel();
     super.dispose();
   }
