@@ -12,7 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from backend.app.api.deps import get_current_host, bearer_scheme
-from backend.app.api.v1.auth import _now, _issue_session, _response, _create_default_template, _send_verification_email
+from backend.app.api.v1.auth import _now, _issue_session, _response, _create_default_template, _require_smtp, _send_verification_email
 from backend.app.core.config import _normalize_redirect_url, settings
 from backend.app.core.database import Base, get_db
 from backend.app.core.rate_limit import limit_auth_requests
@@ -142,8 +142,9 @@ class ChangePassword(BaseModel):
 
 @router.post("/password/forgot")
 def forgot_password(req: ForgotPassword, db: Session = Depends(get_db)):
+    _require_smtp()
     host = db.scalar(select(HostUser).where(HostUser.email == str(req.email).lower(), HostUser.is_active.is_(True)).with_for_update())
-    if host and settings.SMTP_HOST and settings.SMTP_FROM_EMAIL:
+    if host:
         code = f"{secrets.randbelow(1_000_000):06d}"
         host.reset_code_hash, host.reset_code_salt = hash_password(code)
         host.reset_expires_at, host.reset_attempts = _now() + timedelta(minutes=30), 0

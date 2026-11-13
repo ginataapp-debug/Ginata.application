@@ -93,6 +93,8 @@ def test_password_recovery_and_logout_all(platform_env):
     assert client.post("/api/v1/auth/password/reset", json={"email": EMAIL, "code": "000000" if code != "000000" else "000001", "new_password": "new-password-123"}).status_code == 400
     reset = client.post("/api/v1/auth/password/reset", json={"email": EMAIL, "code": code, "new_password": "new-password-123"})
     assert reset.status_code == 200
+    assert client.post("/api/v1/auth/login", json={"email": EMAIL, "password": PASSWORD}).status_code == 401
+    assert client.post("/api/v1/auth/login", json={"email": EMAIL, "password": "new-password-123"}).status_code == 200
     assert client.get("/api/v1/auth/me", headers=headers(token)).status_code == 401
     assert client.post("/api/v1/auth/password/reset", json={"email": EMAIL, "code": code, "new_password": "new-password-123"}).status_code == 400
     token = client.post("/api/v1/auth/login", json={"email": EMAIL, "password": "new-password-123"}).json()["token"]
@@ -104,6 +106,22 @@ def test_password_recovery_and_logout_all(platform_env):
     assert client.post("/api/v1/auth/logout-all", headers=headers(token)).status_code == 200
     assert client.get("/api/v1/auth/me", headers=headers(token)).status_code == 401
     assert client.post("/api/v1/auth/password/forgot", json={"email": "absent@example.com"}).status_code == 200
+
+
+def test_password_recovery_reports_missing_email_configuration_for_any_address(platform_env, monkeypatch):
+    client, factory, smtp = platform_env
+    signup(client)
+    monkeypatch.setattr(settings, "SMTP_HOST", "")
+
+    for email in (EMAIL, "absent@example.com"):
+        response = client.post("/api/v1/auth/password/forgot", json={"email": email})
+        assert response.status_code == 503
+        assert "Email delivery is not configured" in response.json()["detail"]
+
+    smtp.send_message.assert_not_called()
+    with factory() as db:
+        host = db.scalar(select(HostUser).where(HostUser.email == EMAIL))
+        assert host.reset_code_hash is None
 
 
 def test_delete_account_isolation_and_shared_org(platform_env):

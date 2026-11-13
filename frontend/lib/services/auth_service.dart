@@ -243,7 +243,7 @@ class AuthService {
     }
 
     try {
-      final response = await http
+      final response = await client
           .post(
             Uri.parse('$_baseUrl/auth/login'),
             headers: {'Content-Type': 'application/json'},

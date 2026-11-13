@@ -47,7 +47,7 @@ def _issue_session(db: Session, host: HostUser) -> str:
 
 def _require_smtp() -> None:
     if not settings.SMTP_HOST or not settings.SMTP_FROM_EMAIL:
-        raise HTTPException(503, "Email verification service is not configured. Set SMTP_HOST and SMTP_FROM_EMAIL.")
+        raise HTTPException(503, "Email delivery is not configured. Set SMTP_HOST and SMTP_FROM_EMAIL.")
     if not settings.SMTP_USE_SSL and not settings.SMTP_STARTTLS:
         raise HTTPException(503, "Email verification service requires SMTP SSL or STARTTLS.")
 
