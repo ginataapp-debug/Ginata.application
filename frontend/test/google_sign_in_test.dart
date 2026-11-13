@@ -54,6 +54,23 @@ void main() {
     );
   });
 
+  test('web redirect removes empty query and fragment delimiters', () {
+    expect(
+      AuthService.googleWebRedirectUri(
+        Uri.parse('https://ginata-application.pages.dev/'),
+      ),
+      'https://ginata-application.pages.dev/',
+    );
+    expect(
+      AuthService.googleWebRedirectUri(
+        Uri.parse(
+          'https://ginata-application.pages.dev/app/?mode=signup#section',
+        ),
+      ),
+      'https://ginata-application.pages.dev/app/',
+    );
+  });
+
   test('Google callback exchanges PKCE code for a Ginata session', () async {
     final requests = <http.Request>[];
     final client = MockClient((request) async {

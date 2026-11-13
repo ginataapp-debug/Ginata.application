@@ -30,7 +30,7 @@ class AuthService {
       'com.ginata.app://login-callback';
 
   static String googleWebRedirectUri(Uri currentUri) =>
-      currentUri.replace(queryParameters: const {}, fragment: '').toString();
+      Uri.parse('${currentUri.origin}${currentUri.path}').toString();
 
   static String _base64UrlNoPadding(List<int> bytes) =>
       base64Url.encode(bytes).replaceAll('=', '');

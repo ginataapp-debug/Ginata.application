@@ -9,17 +9,26 @@ GitHub repository: https://github.com/ginataapp-debug/Ginata.application
 
 IMPORTANT STATUS
 ----------------
-At the latest check on 2026-11-13, the Pages root served the Flutter app shell
-with `/` as its base path. Render initially returned HTTP 503 during startup;
-on retry, `/api/v1/auth/config` reported Google sign-in enabled. However, the
-live authorize-url endpoint rejected
-`https://ginata-application.pages.dev/` with HTTP 400 ("This sign-in redirect
-is not allowed"), while the legacy hashed `/app/` redirect was accepted. A
-CORS preflight from the new Pages origin also returned HTTP 400 without an
-allow-origin header. Production Google sign-in from the URL above will fail
-until the Render environment variables are updated and redeployed. The config
-endpoint only confirms Supabase URL/key presence; it does not prove a real
-Google account can complete OAuth.
+Live verification on 2026-11-13 at 23:50 EAT:
+- The Pages root serves the Flutter app shell with `/` as its base path.
+- `/api/v1/auth/config` reports Google sign-in enabled.
+- Direct authorize-url requests accept both
+  `https://ginata-application.pages.dev/` and
+  `https://ginata-application.pages.dev/app/`.
+- A CORS preflight from `https://ginata-application.pages.dev` returns HTTP 200
+  with the matching allow-origin header.
+- Supabase returns HTTP 302 to Google's authorization page for the root
+  callback, using the configured Supabase callback URI.
+
+The browser's actual request was later captured with
+`redirect_to=https://ginata-application.pages.dev/?#`, which the backend
+correctly rejects. The frontend created empty query and fragment delimiters
+while stripping the current URL's query/fragment. The source fix now rebuilds
+the redirect from origin and path only; deploy the updated Cloudflare frontend
+before retesting. An actual sign-in through Google's account/consent step and
+the Ginata callback has not yet been completed. The config endpoint only
+confirms Supabase URL/key presence; it does not prove a real Google account can
+complete OAuth.
 
 Commit de2f154 is pushed to the existing GitHub main branch. Render's deployment
 of this commit and delivery of a reset code to a real test mailbox still need
