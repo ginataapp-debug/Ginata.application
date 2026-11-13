@@ -57,6 +57,9 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
   // Conflict state
   bool _hasConflict = false;
   String? _conflictMessage;
+  String? _conflictCheckError;
+  bool _isCheckingConflict = false;
+  int _conflictCheckSequence = 0;
   bool _overrideConflict = false;
   final _overrideReasonCtrl = TextEditingController();
   bool _isSaving = false;
@@ -170,6 +173,7 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
     if (propId == null) return;
     setState(() {
       _selectedPropertyId = propId;
+      _resetConflictOverride();
       final prop = _properties.firstWhere((p) => p['id']?.toString() == propId, orElse: () => null);
       if (prop != null) {
         final units = prop['units'] as List<dynamic>?;
@@ -203,23 +207,49 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
 
   double get _netHostPayout => _grandTotal - _agentCommissionAmount;
 
-  Future<void> _checkConflictsRealtime() async {
-    if (_selectedPropertyId == null) return;
+  void _resetConflictOverride() {
+    _hasConflict = false;
+    _conflictMessage = null;
+    _overrideConflict = false;
+    _overrideReasonCtrl.clear();
+  }
+
+  Future<bool> _checkConflictsRealtime() async {
+    final propertyId = _selectedPropertyId;
+    if (propertyId == null) return false;
+    final sequence = ++_conflictCheckSequence;
+    if (mounted) {
+      setState(() {
+        _isCheckingConflict = true;
+        _conflictCheckError = null;
+      });
+    }
     try {
       final conflict = await ApiService.checkConflicts({
-        'property_id': _selectedPropertyId!,
+        'property_id': propertyId,
         'check_in_date': DateFormat('yyyy-MM-dd').format(_checkIn),
         'check_out_date': DateFormat('yyyy-MM-dd').format(_checkOut),
         if (_selectedUnitId != null) 'unit_id': _selectedUnitId,
         if (widget.initialData?['id'] != null) 'exclude_reservation_id': widget.initialData!['id'],
       });
-      if (mounted) {
+      if (mounted && sequence == _conflictCheckSequence) {
         setState(() {
           _hasConflict = conflict['has_conflict'] == true;
           _conflictMessage = conflict['message'];
+          _isCheckingConflict = false;
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      if (mounted && sequence == _conflictCheckSequence) {
+        setState(() {
+          _isCheckingConflict = false;
+          _conflictCheckError = error.toString();
         });
       }
-    } catch (_) {}
+      return false;
+    }
   }
 
   Future<void> _submitBooking() async {
@@ -230,6 +260,8 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
       );
       return;
     }
+
+    if (!await _checkConflictsRealtime() || !mounted) return;
 
     if (_hasConflict && !_overrideConflict) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -311,6 +343,14 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
   Widget build(BuildContext context) {
     final currentProp = _properties.firstWhere((p) => p['id']?.toString() == _selectedPropertyId, orElse: () => null);
     final units = (currentProp?['units'] as List<dynamic>?) ?? [];
+    final selectedUnit = units.firstWhere(
+      (unit) => unit['id']?.toString() == _selectedUnitId,
+      orElse: () => null,
+    );
+    final maxGuests = int.tryParse(
+      (selectedUnit?['max_guests'] ?? currentProp?['max_guests'])?.toString() ??
+          '',
+    );
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -403,7 +443,10 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                             return DropdownMenuItem(value: u['id'].toString(), child: Text(u['name'].toString()));
                           }).toList(),
                           onChanged: (val) {
-                            setState(() => _selectedUnitId = val);
+                            setState(() {
+                              _selectedUnitId = val;
+                              _resetConflictOverride();
+                            });
                             _checkConflictsRealtime();
                           },
                         ),
@@ -470,6 +513,7 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                             setState(() {
                               _checkIn = range.start;
                               _checkOut = range.end;
+                              _resetConflictOverride();
                             });
                             _checkConflictsRealtime();
                           }
@@ -604,8 +648,21 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                             child: TextFormField(
                               controller: _guestsCtrl,
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(labelText: 'Guests *'),
-                              validator: (v) => (int.tryParse(v ?? '') ?? 0) <= 0 ? 'Min 1' : null,
+                              decoration: InputDecoration(
+                                labelText: maxGuests == null
+                                    ? 'Guests *'
+                                    : 'Guests (max $maxGuests) *',
+                              ),
+                              validator: (value) {
+                                final guests = int.tryParse(value ?? '');
+                                if (guests == null || guests < 1) {
+                                  return 'Enter at least 1 guest';
+                                }
+                                if (maxGuests != null && guests > maxGuests) {
+                                  return 'Maximum capacity is $maxGuests';
+                                }
+                                return null;
+                              },
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -627,6 +684,76 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                         ],
                       ),
                       const SizedBox(height: 16),
+
+                      if (_isCheckingConflict) ...[
+                        const LinearProgressIndicator(
+                          color: GinataColors.primary,
+                          minHeight: 2,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Checking reservation and channel availability…',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: GinataColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ] else if (_conflictCheckError != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: GinataColors.errorContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.cloud_off_outlined,
+                                size: 18,
+                                color: GinataColors.alertTerracotta,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Availability could not be verified: $_conflictCheckError',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: GinataColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    _checkConflictsRealtime(),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ] else if (_selectedPropertyId != null &&
+                          !_hasConflict) ...[
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline,
+                              size: 16,
+                              color: GinataColors.successSage,
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              'Dates are clear for this property and unit.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: GinataColors.successSage,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
 
                       // Conflict Warning Box
                       if (_hasConflict) ...[
@@ -671,6 +798,10 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                                     labelText: 'Override Reason *',
                                     hintText: 'e.g. Upgraded unit with host approval',
                                   ),
+                                  validator: (value) =>
+                                      value == null || value.trim().length < 3
+                                      ? 'Enter a reason of at least 3 characters'
+                                      : null,
                                 ),
                             ],
                           ),
@@ -857,10 +988,16 @@ class _ManualBookingDialogState extends State<ManualBookingDialog> {
                           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                           : const Icon(Icons.check, size: 16),
                       label: Text(
-                        _isSaving ? 'Saving...' : ((widget.initialData != null && widget.initialData!['id'] != null) ? 'Save Changes' : 'Confirm Booking'),
+                        _isSaving
+                            ? 'Saving...'
+                            : _isCheckingConflict
+                            ? 'Checking availability...'
+                            : ((widget.initialData != null && widget.initialData!['id'] != null) ? 'Save Changes' : 'Confirm Booking'),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      onPressed: _isSaving ? null : _submitBooking,
+                      onPressed: _isSaving || _isCheckingConflict
+                          ? null
+                          : _submitBooking,
                     ),
                   ],
                 ),

@@ -58,9 +58,6 @@ void main() {
     final requests = <http.Request>[];
     final client = MockClient((request) async {
       requests.add(request);
-      if (request.url.path.endsWith('/auth/config')) {
-        return _json({'google_sign_in_enabled': true});
-      }
       if (request.url.path.endsWith('/auth/google/authorize-url')) {
         return _json({
           'url': 'https://supabase.example.test/auth/v1/authorize',
@@ -104,7 +101,10 @@ void main() {
     expect(started['success'], isTrue);
     expect(started['url'], startsWith('https://'));
 
-    final authorizeBody = jsonDecode(requests[1].body) as Map<String, dynamic>;
+    expect(requests, hasLength(1));
+    expect(requests.single.url.path, '/api/v1/auth/google/authorize-url');
+    final authorizeBody =
+        jsonDecode(requests.single.body) as Map<String, dynamic>;
     expect(authorizeBody['redirect_to'], 'https://ginata.example.test/');
 
     final callback = await AuthService.handleGoogleCallback(
@@ -112,7 +112,7 @@ void main() {
     );
     expect(callback?['success'], isTrue);
 
-    final exchangeBody = jsonDecode(requests[2].body) as Map<String, dynamic>;
+    final exchangeBody = jsonDecode(requests[1].body) as Map<String, dynamic>;
     expect(exchangeBody['code'], 'supabase-auth-code');
     final verifier = exchangeBody['code_verifier'] as String;
     expect(verifier, matches(RegExp(r'^[A-Za-z0-9_-]{43}$')));
@@ -130,9 +130,6 @@ void main() {
       final requests = <http.Request>[];
       final client = MockClient((request) async {
         requests.add(request);
-        if (request.url.path.endsWith('/auth/config')) {
-          return _json({'google_sign_in_enabled': true});
-        }
         if (request.url.path.endsWith('/auth/google/authorize-url')) {
           return _json({
             'url': 'https://supabase.example.test/auth/v1/authorize',
@@ -158,7 +155,7 @@ void main() {
 
       expect(result?['success'], isFalse);
       expect(result?['message'], 'Google sign-in was cancelled.');
-      expect(requests, hasLength(2));
+      expect(requests, hasLength(1));
     },
   );
 
@@ -168,9 +165,6 @@ void main() {
       final requests = <http.Request>[];
       final client = MockClient((request) async {
         requests.add(request);
-        if (request.url.path.endsWith('/auth/config')) {
-          return _json({'google_sign_in_enabled': true});
-        }
         if (request.url.path.endsWith('/auth/google/authorize-url')) {
           return _json({
             'url': 'https://supabase.example.test/auth/v1/authorize',
@@ -204,7 +198,7 @@ void main() {
       );
       expect(result?['success'], isFalse);
       expect(result?['message'], 'Google sign-in expired or was rejected.');
-      expect(requests, hasLength(3));
+      expect(requests, hasLength(2));
       expect(await AuthService.getToken(), isEmpty);
     },
   );

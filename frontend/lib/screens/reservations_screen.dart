@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../theme/ginata_theme.dart';
 import '../services/api_service.dart';
 import 'manual_booking_dialog.dart';
@@ -17,6 +18,9 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   List<dynamic> _reservations = [];
   bool _isLoading = true;
   String _selectedFilter = 'all';
+  String _searchQuery = '';
+  DateTimeRange? _dateRange;
+  String? _loadError;
 
   @override
   void initState() {
@@ -25,13 +29,90 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
   }
 
   Future<void> _loadReservations() async {
-    setState(() => _isLoading = true);
-    final status = _selectedFilter == 'all' ? null : _selectedFilter;
-    final res = await ApiService.fetchReservations(statusFilter: status);
-    setState(() {
-      _reservations = res;
-      _isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final status = _selectedFilter == 'all' ? null : _selectedFilter;
+      final res = await ApiService.fetchReservations(statusFilter: status);
+      if (!mounted) return;
+      setState(() {
+        _reservations = res;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<dynamic> get _visibleReservations {
+    final query = _searchQuery.trim().toLowerCase();
+    return _reservations.where((reservation) {
+      if (reservation is! Map) return false;
+      final guest = reservation['primary_guest'] is Map
+          ? reservation['primary_guest'] as Map
+          : const {};
+      final property = reservation['property'] is Map
+          ? reservation['property'] as Map
+          : const {};
+      final unit = reservation['unit'] is Map
+          ? reservation['unit'] as Map
+          : const {};
+      if (query.isNotEmpty) {
+        final searchable = [
+          guest['first_name'],
+          guest['last_name'],
+          guest['email'],
+          guest['phone'],
+          property['name'],
+          unit['name'],
+          reservation['booking_reference'],
+          reservation['booking_source'],
+        ].whereType<Object>().join(' ').toLowerCase();
+        if (!searchable.contains(query)) return false;
+      }
+
+      final range = _dateRange;
+      if (range == null) return true;
+      final checkIn = DateTime.tryParse(
+        reservation['check_in_date']?.toString() ?? '',
+      );
+      final checkOut = DateTime.tryParse(
+        reservation['check_out_date']?.toString() ?? '',
+      );
+      if (checkIn == null || checkOut == null) return false;
+      final rangeStart = DateTime(range.start.year, range.start.month, range.start.day);
+      final rangeEndExclusive = DateTime(
+        range.end.year,
+        range.end.month,
+        range.end.day,
+      ).add(const Duration(days: 1));
+      return checkIn.isBefore(rangeEndExclusive) &&
+          checkOut.isAfter(rangeStart);
+    }).toList();
+  }
+
+  bool get _hasActiveFilters =>
+      _selectedFilter != 'all' ||
+      _searchQuery.trim().isNotEmpty ||
+      _dateRange != null;
+
+  Future<void> _selectDateRange() async {
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      initialDateRange: _dateRange,
+      helpText: 'FILTER STAYS BY DATE',
+    );
+    if (range != null && mounted) setState(() => _dateRange = range);
   }
 
   void _showReservationDetails(Map<String, dynamic> res) async {
@@ -43,7 +124,7 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
         ),
       ),
     );
-    _loadReservations();
+    if (mounted) _loadReservations();
   }
 
   @override
@@ -93,34 +174,145 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search guest, property, or reference',
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _searchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: () => setState(() => _searchQuery = ''),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                      isDense: true,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _selectDateRange,
+                  icon: const Icon(Icons.date_range, size: 16),
+                  label: Text(
+                    _dateRange == null
+                        ? 'Dates'
+                        : '${DateFormat('d MMM').format(_dateRange!.start)} – ${DateFormat('d MMM').format(_dateRange!.end)}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (_dateRange != null)
+                  IconButton(
+                    tooltip: 'Clear date filter',
+                    onPressed: () => setState(() => _dateRange = null),
+                    icon: const Icon(Icons.close, size: 18),
+                  ),
+              ],
+            ),
+          ),
+          if (_dateRange != null || _searchQuery.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '${_visibleReservations.length} matching stay${_visibleReservations.length == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: GinataColors.textSecondary,
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 8),
 
           // Reservation List
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: GinataColors.primary))
-                : _reservations.isEmpty
+                : _loadError != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.cloud_off_outlined, size: 42, color: GinataColors.alertTerracotta),
+                            const SizedBox(height: 8),
+                            const Text('Could not load reservations'),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: Text(
+                                _loadError!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: _loadReservations,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _visibleReservations.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.hotel_outlined, size: 48, color: GinataColors.outline),
                             const SizedBox(height: 12),
-                            const Text('No reservations recorded yet', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GinataColors.primary)),
-                            const SizedBox(height: 4),
-                            const Text('Create a direct booking or sync Airbnb & Booking.com channels.', style: TextStyle(fontSize: 12, color: GinataColors.textSecondary), textAlign: TextAlign.center),
-                            const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: GinataColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              icon: const Icon(Icons.add, size: 16),
-                              label: const Text('Create First Booking', style: TextStyle(fontWeight: FontWeight.bold)),
-                              onPressed: widget.onOpenNewBooking,
+                            Text(
+                              !_hasActiveFilters
+                                  ? 'No reservations recorded yet'
+                                  : 'No stays match these filters',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GinataColors.primary),
                             ),
+                            const SizedBox(height: 4),
+                            Text(
+                              !_hasActiveFilters
+                                  ? 'Create a direct booking or sync Airbnb & Booking.com channels.'
+                                  : 'Try a different search, date range, or status.',
+                              style: const TextStyle(fontSize: 12, color: GinataColors.textSecondary),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            if (_hasActiveFilters)
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _dateRange = null;
+                                    _selectedFilter = 'all';
+                                  });
+                                  _loadReservations();
+                                },
+                                child: const Text('Clear filters'),
+                              )
+                            else
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: GinataColors.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text('Create First Booking', style: TextStyle(fontWeight: FontWeight.bold)),
+                                onPressed: widget.onOpenNewBooking,
+                              ),
                           ],
                         ),
                       )
@@ -129,8 +321,8 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
                         color: GinataColors.primary,
                         child: ListView.builder(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-                          itemCount: _reservations.length,
-                          itemBuilder: (ctx, idx) => _buildReservationCard(_reservations[idx]),
+                          itemCount: _visibleReservations.length,
+                          itemBuilder: (ctx, idx) => _buildReservationCard(_visibleReservations[idx]),
                         ),
                       ),
           ),
@@ -571,6 +763,33 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
     }
   }
 
+  Future<void> _changeStayStatus({required bool checkIn}) async {
+    final reservationId = _reservation['id'].toString();
+    try {
+      final updated = checkIn
+          ? await ApiService.checkIn(reservationId)
+          : await ApiService.checkOut(reservationId);
+      if (!mounted) return;
+      setState(() => _reservation = updated);
+      widget.onRefresh();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(checkIn ? 'Guest checked in.' : 'Guest checked out.'),
+          backgroundColor: GinataColors.primary,
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not update stay status: $error'),
+            backgroundColor: GinataColors.alertTerracotta,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final res = _reservation;
@@ -581,6 +800,7 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
     final totalKes = GinataFormatters.formatKES(res['total_amount']);
     final paidKes = GinataFormatters.formatKES(res['amount_paid']);
     final balanceKes = GinataFormatters.formatKES(res['balance_due']);
+    final reservationStatus = res['reservation_status']?.toString() ?? 'draft';
 
     final initial = guestName.isNotEmpty ? guestName[0].toUpperCase() : 'G';
     final refLabel = (res['booking_reference'] ?? res['id'].toString().substring(0, 8)).toString();
@@ -605,7 +825,11 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(guestName.isEmpty ? 'Guest' : guestName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis),
-                    Text('$propName • Ref: $refLabel', style: const TextStyle(fontSize: 11, color: Colors.white70), overflow: TextOverflow.ellipsis),
+                    Text(
+                      '$propName • ${reservationStatus.replaceAll('_', ' ').toUpperCase()} • Ref: $refLabel',
+                      style: const TextStyle(fontSize: 11, color: Colors.white70),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
@@ -639,6 +863,32 @@ class _ReservationDetailsPageState extends State<ReservationDetailsPage> {
                 label: const Text('Payment', style: TextStyle(fontSize: 12)),
                 onPressed: _recordPayment,
               ),
+              if (reservationStatus == 'confirmed' ||
+                  reservationStatus == 'checked_in')
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: GinataColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                  ),
+                  icon: Icon(
+                    reservationStatus == 'confirmed'
+                        ? Icons.login
+                        : Icons.logout,
+                    size: 15,
+                  ),
+                  label: Text(
+                    reservationStatus == 'confirmed'
+                        ? 'Check In'
+                        : 'Check Out',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  onPressed: () => _changeStayStatus(
+                    checkIn: reservationStatus == 'confirmed',
+                  ),
+                ),
               OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10)),
                 icon: const Icon(Icons.receipt_long, size: 15, color: GinataColors.primary),

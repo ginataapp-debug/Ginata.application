@@ -50,23 +50,6 @@ class AuthService {
   }) async {
     final verifier = _newCodeVerifier();
     try {
-      final configResponse = await client
-          .get(Uri.parse('$_baseUrl/auth/config'))
-          .timeout(const Duration(seconds: 30));
-      final config = _decodeBody(configResponse);
-      if (configResponse.statusCode != 200) {
-        return _responseError(
-          configResponse,
-          'Could not check Google sign-in availability.',
-        );
-      }
-      if (config['google_sign_in_enabled'] != true) {
-        return {
-          'success': false,
-          'message': 'Google sign-in is not enabled on the Ginata server yet.',
-        };
-      }
-
       await _secureStorage.write(key: _keyGoogleCodeVerifier, value: verifier);
       await _secureStorage.write(
         key: _keyGoogleRedirectUri,
@@ -82,7 +65,7 @@ class AuthService {
               'code_challenge': createGoogleCodeChallenge(verifier),
             }),
           )
-          .timeout(const Duration(seconds: 30));
+          .timeout(const Duration(seconds: 90));
       final body = _decodeBody(response);
       if (response.statusCode != 200) {
         await _clearGoogleSignInAttempt();

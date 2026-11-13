@@ -36,15 +36,24 @@ def test_google_config_authorize_and_new_account(platform_env, monkeypatch):
     client, factory, _ = platform_env
     google_mock(monkeypatch)
     assert client.get("/api/v1/auth/config").json()["google_sign_in_enabled"]
+    assert "https://ginata-application.pages.dev" in settings.CORS_ALLOWED_ORIGINS
     response = client.post("/api/v1/auth/google/authorize-url", json={"redirect_to": "com.ginata.app://login-callback", "code_challenge": "a" * 43})
     assert response.status_code == 200
     assert "code_challenge_method=s256" in response.json()["url"]
-    production_redirect = "https://123159d9.ginata-application.pages.dev/app/"
+    production_redirect = "https://ginata-application.pages.dev/"
     production_response = client.post(
         "/api/v1/auth/google/authorize-url",
         json={"redirect_to": production_redirect, "code_challenge": "a" * 43},
     )
     assert production_response.status_code == 200
+    app_redirect_response = client.post(
+        "/api/v1/auth/google/authorize-url",
+        json={
+            "redirect_to": "https://ginata-application.pages.dev/app/",
+            "code_challenge": "a" * 43,
+        },
+    )
+    assert app_redirect_response.status_code == 200
     assert client.post(
         "/api/v1/auth/google/authorize-url",
         json={"redirect_to": "https://123159d9.ginata-application.pages.dev/app", "code_challenge": "a" * 43},
@@ -171,8 +180,9 @@ def test_property_calendar_tasks_guests_and_tenant_boundaries(platform_env, monk
     client, factory, _ = platform_env
     first, second = signup(client).json(), signup(client, "second@example.com").json()
     h, other = headers(first["token"]), headers(second["token"])
-    prop = client.post("/api/v1/properties", headers=h, json={"name": "Villa", "slug": "villa", "description": "Warm villa", "amenities": ["WiFi"], "airbnb_ical_url": "https://www.airbnb.com/calendar/ical/test.ics"}).json()
+    prop = client.post("/api/v1/properties", headers=h, json={"name": "Villa", "slug": "villa", "description": "Warm villa", "amenities": ["WiFi"], "bedrooms": 2, "bathrooms": 1, "max_guests": 2, "airbnb_ical_url": "https://www.airbnb.com/calendar/ical/test.ics"}).json()
     assert prop["description"] == "Warm villa"
+    assert prop["max_guests"] == 2
     assert client.get(f"/api/v1/properties/{prop['id']}/feed.ics").status_code == 404
     assert client.get(f"/api/v1/properties/{prop['id']}/feed.ics?token={prop['ical_feed_token']}").status_code == 200
     from backend.app.services import ical_service
@@ -182,10 +192,23 @@ def test_property_calendar_tasks_guests_and_tenant_boundaries(platform_env, monk
     assert synced.json()["imported"] == 1
     assert client.get("/api/v1/properties/external-blocks", headers=other).json() == []
     booking = {"property_id": prop["id"], "guest_first_name": "Guest", "guest_last_name": "One", "check_in_date": "2026-12-10", "check_out_date": "2026-12-12", "number_of_guests": 1}
+    over_capacity = client.post(
+        "/api/v1/reservations",
+        headers=h,
+        json={**booking, "number_of_guests": 3},
+    )
+    assert over_capacity.status_code == 400
+    assert "property maximum capacity of 2" in over_capacity.json()["detail"]
     created = client.post("/api/v1/reservations", headers=h, json=booking)
     assert created.status_code == 201, created.text
     res = created.json()
     assert res["nightly_rate"] == "15000.00"
+    over_capacity_update = client.patch(
+        f"/api/v1/reservations/{res['id']}",
+        headers=h,
+        json={"number_of_guests": 3},
+    )
+    assert over_capacity_update.status_code == 400
     assert client.post(f"/api/v1/reservations/{res['id']}/check-in", headers=other).status_code == 404
     assert client.post(f"/api/v1/reservations/{res['id']}/check-in", headers=h).status_code == 200
     assert client.post(f"/api/v1/reservations/{res['id']}/check-out", headers=h).status_code == 200

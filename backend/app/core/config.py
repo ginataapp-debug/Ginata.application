@@ -54,7 +54,7 @@ class Settings(BaseModel):
         _normalize_redirect_url(value)
         for value in os.getenv(
             "AUTH_REDIRECT_URLS",
-            "com.ginata.app://login-callback,https://123159d9.ginata-application.pages.dev/app/,http://localhost:3000/app/,http://127.0.0.1:3000/app/",
+            "com.ginata.app://login-callback,https://ginata-application.pages.dev/,https://ginata-application.pages.dev/app/,https://123159d9.ginata-application.pages.dev/app/,http://localhost:3000/app/,http://127.0.0.1:3000/app/",
         ).split(",")
         if value.strip()
     ]
@@ -78,7 +78,7 @@ class Settings(BaseModel):
     CORS_ALLOWED_ORIGINS: list[str] = [
         origin.strip().rstrip("/")
         for origin in os.getenv(
-            "CORS_ALLOWED_ORIGINS", "https://123159d9.ginata-application.pages.dev,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080"
+            "CORS_ALLOWED_ORIGINS", "https://ginata-application.pages.dev,https://123159d9.ginata-application.pages.dev,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080"
         ).split(",") if origin.strip() and origin.strip() != "*"
     ]
     CORS_ALLOWED_ORIGIN_REGEX: str = os.getenv(

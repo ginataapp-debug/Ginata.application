@@ -150,11 +150,18 @@ def create_manual_booking(
         ).scalar_one_or_none()
         if not unit:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Property unit not found")
-        if booking_in.number_of_guests > unit.max_guests:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Guest count ({booking_in.number_of_guests}) exceeds unit maximum capacity of {unit.max_guests}"
-            )
+    capacity = unit.max_guests if unit is not None else prop.max_guests
+    if booking_in.number_of_guests < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Guest count must be at least one"
+        )
+    if capacity is not None and booking_in.number_of_guests > capacity:
+        capacity_label = "unit" if unit is not None else "property"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Guest count ({booking_in.number_of_guests}) exceeds {capacity_label} maximum capacity of {capacity}"
+        )
 
     # 3. Check dates & overlapping conflicts
     conflicts = check_booking_conflicts(
@@ -396,8 +403,32 @@ def update_reservation(
     new_check_in = update_in.check_in_date or reservation.check_in_date
     new_check_out = update_in.check_out_date or reservation.check_out_date
     new_unit_id = update_in.unit_id if update_in.unit_id is not None else reservation.unit_id
-    if new_unit_id and not db.scalar(select(PropertyUnit.id).where(PropertyUnit.id == new_unit_id, PropertyUnit.property_id == reservation.property_id)):
-        raise HTTPException(404, "Unit not found for this property")
+    unit = None
+    if new_unit_id:
+        unit = db.scalar(
+            select(PropertyUnit).where(
+                PropertyUnit.id == new_unit_id,
+                PropertyUnit.property_id == reservation.property_id,
+            )
+        )
+        if unit is None:
+            raise HTTPException(404, "Unit not found for this property")
+
+    guest_count = (
+        update_in.number_of_guests
+        if update_in.number_of_guests is not None
+        else reservation.number_of_guests
+    )
+    if guest_count < 1:
+        raise HTTPException(400, "Guest count must be at least one")
+    prop = db.scalar(select(Property).where(Property.id == reservation.property_id))
+    capacity = unit.max_guests if unit is not None else prop.max_guests
+    if capacity is not None and guest_count > capacity:
+        capacity_label = "unit" if unit is not None else "property"
+        raise HTTPException(
+            400,
+            f"Guest count ({guest_count}) exceeds {capacity_label} maximum capacity of {capacity}",
+        )
 
     dates_changed = (new_check_in != reservation.check_in_date) or (new_check_out != reservation.check_out_date) or (new_unit_id != reservation.unit_id)
 
@@ -473,7 +504,6 @@ def update_reservation(
     if update_in.tax_amount is not None:
         reservation.tax_amount = Decimal(str(update_in.tax_amount))
     elif dates_changed or update_in.nightly_rate is not None:
-        prop = db.execute(select(Property).where(Property.id == reservation.property_id)).scalar_one()
         subtotal_for_tax = max(Decimal("0.00"), reservation.base_amount + reservation.cleaning_fee + reservation.service_fee - reservation.discount_amount)
         reservation.tax_amount = (subtotal_for_tax * prop.tax_rate).quantize(Decimal("0.01"))
 

@@ -2,24 +2,24 @@ GINATA PRODUCTION LAUNCH CHECKLIST
 ==================================
 
 Checked: 2026-11-13
-Production web app: https://123159d9.ginata-application.pages.dev/app/
+Production web app: https://ginata-application.pages.dev/
 Render API: https://ginata-backend.onrender.com
 Supabase project: https://nwzivgrkvqynhfivvrlq.supabase.co
 GitHub repository: https://github.com/ginataapp-debug/Ginata.application
 
 IMPORTANT STATUS
 ----------------
-The API root and auth config respond successfully. Live checks on 2026-11-13
-also confirmed:
-- The marketing homepage and /app/ both return HTTP 200.
-- A production-origin CORS preflight returns the matching
-  Access-Control-Allow-Origin header.
-- POST /api/v1/auth/google/authorize-url accepts the production /app/ callback
-  and returns a Supabase authorization URL. This does not prove a real Google
-  sign-in will complete.
-- A password-recovery request for a synthetic address returned the generic
-  success response. That response intentionally does not prove an email was
-  delivered, and does not establish that Render is running the latest code.
+At the latest check on 2026-11-13, the Pages root served the Flutter app shell
+with `/` as its base path. Render initially returned HTTP 503 during startup;
+on retry, `/api/v1/auth/config` reported Google sign-in enabled. However, the
+live authorize-url endpoint rejected
+`https://ginata-application.pages.dev/` with HTTP 400 ("This sign-in redirect
+is not allowed"), while the legacy hashed `/app/` redirect was accepted. A
+CORS preflight from the new Pages origin also returned HTTP 400 without an
+allow-origin header. Production Google sign-in from the URL above will fail
+until the Render environment variables are updated and redeployed. The config
+endpoint only confirms Supabase URL/key presence; it does not prove a real
+Google account can complete OAuth.
 
 Commit de2f154 is pushed to the existing GitHub main branch. Render's deployment
 of this commit and delivery of a reset code to a real test mailbox still need
@@ -35,8 +35,12 @@ local APK or web build as a production deployment.
 
 2. CLOUDFLARE PAGES
 -------------------
-This repository builds one combined Pages site: the marketing site at / and
-the Flutter app at /app/. Use:
+The repository build script creates a combined Pages site with the marketing
+site at / and the Flutter app at /app/. The current live root instead serves
+the Flutter app shell with base path `/`; confirm Cloudflare's configured
+build command and output directory match the intended site layout. The auth
+redirect allowlist below includes both the live root and `/app/` until the
+deployed route is settled. Use:
 
   Production branch: main
   Root directory: /
@@ -58,9 +62,9 @@ In Render > ginata-backend > Environment, set the following non-secret values
 exactly. Preserve any other required callback URLs (for example Android) when
 replacing a comma-separated variable:
 
-  CORS_ALLOWED_ORIGINS=https://123159d9.ginata-application.pages.dev
+  CORS_ALLOWED_ORIGINS=https://ginata-application.pages.dev,https://123159d9.ginata-application.pages.dev
   CORS_ALLOWED_ORIGIN_REGEX=
-  AUTH_REDIRECT_URLS=com.ginata.app://login-callback,https://123159d9.ginata-application.pages.dev/app/
+  AUTH_REDIRECT_URLS=com.ginata.app://login-callback,https://ginata-application.pages.dev/,https://ginata-application.pages.dev/app/,https://123159d9.ginata-application.pages.dev/app/
   PUBLIC_API_BASE_URL=https://ginata-backend.onrender.com
   GOOGLE_REDIRECT_URI=https://ginata-backend.onrender.com/api/v1/integrations/google/callback
 
@@ -89,7 +93,7 @@ After saving environment variables, deploy/restart Render. Then verify:
   GET https://ginata-backend.onrender.com/api/v1/auth/config
   POST https://ginata-backend.onrender.com/api/v1/auth/google/authorize-url
 with redirect_to set to
-  https://123159d9.ginata-application.pages.dev/app/
+  https://ginata-application.pages.dev/
 and a valid 43-character S256 PKCE challenge. The second request must return
 200 and a Supabase authorize URL. Also verify the CORS preflight from the
 production Pages origin returns the matching Access-Control-Allow-Origin.
@@ -103,8 +107,11 @@ In the Supabase project whose reference is nwzivgrkvqynhfivvrlq:
 2. In Google Cloud, set this Authorized redirect URI on that OAuth client:
    https://nwzivgrkvqynhfivvrlq.supabase.co/auth/v1/callback
 3. Authentication > URL Configuration:
-   Site URL: https://123159d9.ginata-application.pages.dev
-   Redirect URL: https://123159d9.ginata-application.pages.dev/app/
+   Site URL: https://ginata-application.pages.dev/
+   Redirect URLs:
+   https://ginata-application.pages.dev/
+   https://ginata-application.pages.dev/app/
+   https://123159d9.ginata-application.pages.dev/app/ (keep if still used)
    Keep com.ginata.app://login-callback for Android if Android is in use.
 4. Keep these separate: the Google-to-Supabase callback above is not the
    Flutter app callback. Google Forms uses the Render callback in section 3.

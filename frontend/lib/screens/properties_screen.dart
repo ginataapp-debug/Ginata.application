@@ -43,7 +43,20 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
       final name = (p['name'] ?? '').toString().toLowerCase();
       final city = (p['city'] ?? '').toString().toLowerCase();
       final country = (p['country'] ?? '').toString().toLowerCase();
-      return name.contains(q) || city.contains(q) || country.contains(q);
+      final address = (p['address'] ?? '').toString().toLowerCase();
+      final description = (p['description'] ?? '').toString().toLowerCase();
+      final amenities = (p['amenities'] is List ? p['amenities'] as List : const [])
+          .join(' ')
+          .toString()
+          .toLowerCase();
+      return [
+        name,
+        city,
+        country,
+        address,
+        description,
+        amenities,
+      ].any((value) => value.contains(q));
     }).toList();
   }
 
@@ -53,6 +66,13 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
     final addressCtrl = TextEditingController(text: property?['address']?.toString() ?? '');
     final cityCtrl = TextEditingController(text: property?['city']?.toString() ?? 'Nairobi');
     final countryCtrl = TextEditingController(text: property?['country']?.toString() ?? 'Kenya');
+    final descriptionCtrl = TextEditingController(text: property?['description']?.toString() ?? '');
+    final amenitiesCtrl = TextEditingController(
+      text: (property?['amenities'] as List<dynamic>?)?.join(', ') ?? '',
+    );
+    final bedroomsCtrl = TextEditingController(text: property?['bedrooms']?.toString() ?? '');
+    final bathroomsCtrl = TextEditingController(text: property?['bathrooms']?.toString() ?? '');
+    final maxGuestsCtrl = TextEditingController(text: property?['max_guests']?.toString() ?? '');
     final rateCtrl = TextEditingController(text: property?['default_nightly_rate']?.toString() ?? '');
     final cleaningCtrl = TextEditingController(text: property?['cleaning_fee']?.toString() ?? '');
     final imageUrlCtrl = TextEditingController(text: property?['image_url']?.toString() ?? '');
@@ -265,6 +285,61 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      TextField(
+                        controller: descriptionCtrl,
+                        maxLines: 3,
+                        maxLength: 10000,
+                        decoration: const InputDecoration(
+                          labelText: 'Property Description',
+                          hintText: 'What makes this place special?',
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: bedroomsCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Bedrooms',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: bathroomsCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Bathrooms',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: maxGuestsCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Max guests',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: amenitiesCtrl,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                          labelText: 'Amenities',
+                          hintText: 'Wi-Fi, Parking, Pool',
+                          helperText: 'Separate amenities with commas.',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
@@ -363,6 +438,29 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                             return;
                           }
 
+                          final bedroomText = bedroomsCtrl.text.trim();
+                          final bathroomText = bathroomsCtrl.text.trim();
+                          final maxGuestsText = maxGuestsCtrl.text.trim();
+                          final bedrooms = bedroomText.isEmpty ? null : int.tryParse(bedroomText);
+                          final bathrooms = bathroomText.isEmpty ? null : int.tryParse(bathroomText);
+                          final maxGuests = maxGuestsText.isEmpty ? null : int.tryParse(maxGuestsText);
+                          if ((bedroomText.isNotEmpty && (bedrooms == null || bedrooms < 0)) ||
+                              (bathroomText.isNotEmpty && (bathrooms == null || bathrooms < 0)) ||
+                              (maxGuestsText.isNotEmpty && (maxGuests == null || maxGuests < 1))) {
+                            setDialogState(() => errorText = 'Enter valid room counts and a maximum guest count of at least one.');
+                            return;
+                          }
+                          final amenities = amenitiesCtrl.text
+                              .split(',')
+                              .map((amenity) => amenity.trim())
+                              .where((amenity) => amenity.isNotEmpty)
+                              .toSet()
+                              .toList();
+                          if (amenities.length > 50) {
+                            setDialogState(() => errorText = 'Enter no more than 50 amenities.');
+                            return;
+                          }
+
                           final cleaningFee = double.tryParse(cleaningCtrl.text.trim()) ?? 0.0;
 
                           setDialogState(() {
@@ -377,6 +475,11 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                               'address': addressCtrl.text.trim(),
                               'city': cityCtrl.text.trim(),
                               'country': countryCtrl.text.trim(),
+                              'description': descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
+                              'amenities': amenities,
+                              'bedrooms': bedrooms,
+                              'bathrooms': bathrooms,
+                              'max_guests': maxGuests,
                               'default_nightly_rate': nightlyRate,
                               'currency': 'KES',
                               'cleaning_fee': cleaningFee,
@@ -409,6 +512,25 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         );
       },
     );
+
+    for (final controller in [
+      nameCtrl,
+      addressCtrl,
+      cityCtrl,
+      countryCtrl,
+      descriptionCtrl,
+      amenitiesCtrl,
+      bedroomsCtrl,
+      bathroomsCtrl,
+      maxGuestsCtrl,
+      rateCtrl,
+      cleaningCtrl,
+      imageUrlCtrl,
+      airbnbIcalCtrl,
+      bookingIcalCtrl,
+    ]) {
+      controller.dispose();
+    }
 
     if (saved == true) {
       _loadProperties();
@@ -512,6 +634,11 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         'cleaning_fee': double.tryParse(property['cleaning_fee']?.toString() ?? '0') ?? 0,
         'tax_rate': 0.0,
         'image_url': property['image_url']?.toString(),
+        'description': property['description'],
+        'amenities': property['amenities'] ?? [],
+        'bedrooms': property['bedrooms'],
+        'bathrooms': property['bathrooms'],
+        'max_guests': property['max_guests'],
         'airbnb_ical_url': property['airbnb_ical_url']?.toString(),
         'booking_com_ical_url': property['booking_com_ical_url']?.toString(),
       };
@@ -586,6 +713,11 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
         ..writeln('')
         ..writeln('LOCATION')
         ..writeln('  ${property['address'] ?? ''}, ${property['city'] ?? ''}, ${property['country'] ?? 'Kenya'}')
+        ..writeln('  ${property['description'] ?? ''}')
+        ..writeln('  Bedrooms: ${property['bedrooms'] ?? 'Not set'}')
+        ..writeln('  Bathrooms: ${property['bathrooms'] ?? 'Not set'}')
+        ..writeln('  Maximum guests: ${property['max_guests'] ?? 'Not set'}')
+        ..writeln('  Amenities: ${(property['amenities'] as List<dynamic>?)?.join(', ') ?? 'Not set'}')
         ..writeln('')
         ..writeln('RATES')
         ..writeln('  Nightly: ${GinataFormatters.formatKES(property['default_nightly_rate'])}')
@@ -761,6 +893,16 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                             final nightlyRateKes = GinataFormatters.formatKES(prop['default_nightly_rate']);
                             final cleaningFeeKes = GinataFormatters.formatKES(prop['cleaning_fee']);
                             final imageUrl = prop['image_url']?.toString();
+                            final description = prop['description']?.toString().trim() ?? '';
+                            final amenities = (prop['amenities'] is List
+                                    ? prop['amenities'] as List
+                                    : const [])
+                                .whereType<String>()
+                                .where((amenity) => amenity.trim().isNotEmpty)
+                                .toList();
+                            final bedrooms = prop['bedrooms'];
+                            final bathrooms = prop['bathrooms'];
+                            final maxGuests = prop['max_guests'];
                             final hasAirbnbSync = (prop['airbnb_ical_url']?.toString().isNotEmpty ?? false);
                             final hasBookingSync = (prop['booking_com_ical_url']?.toString().isNotEmpty ?? false);
 
@@ -911,6 +1053,97 @@ class _PropertiesScreenState extends State<PropertiesScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
+                                        if (description.isNotEmpty) ...[
+                                          Text(
+                                            description,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              height: 1.4,
+                                              color: GinataColors.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                        ],
+                                        if (bedrooms != null ||
+                                            bathrooms != null ||
+                                            maxGuests != null) ...[
+                                          Row(
+                                            children: [
+                                              if (bedrooms != null)
+                                                _buildMetricBadge(
+                                                  Icons.bedroom_parent_outlined,
+                                                  'Bedrooms',
+                                                  bedrooms.toString(),
+                                                ),
+                                              if (bedrooms != null &&
+                                                  (bathrooms != null ||
+                                                      maxGuests != null))
+                                                const SizedBox(width: 8),
+                                              if (bathrooms != null)
+                                                _buildMetricBadge(
+                                                  Icons.bathtub_outlined,
+                                                  'Bathrooms',
+                                                  bathrooms.toString(),
+                                                ),
+                                              if (bathrooms != null &&
+                                                  maxGuests != null)
+                                                const SizedBox(width: 8),
+                                              if (maxGuests != null)
+                                                _buildMetricBadge(
+                                                  Icons.people_outline,
+                                                  'Max guests',
+                                                  maxGuests.toString(),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                        ],
+                                        if (amenities.isNotEmpty) ...[
+                                          Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: [
+                                              for (final amenity
+                                                  in amenities.take(6))
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 9,
+                                                    vertical: 5,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: GinataColors
+                                                        .secondaryContainer
+                                                        .withValues(alpha: 0.4),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          20,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    amenity,
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      color: GinataColors
+                                                          .primary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              if (amenities.length > 6)
+                                                Text(
+                                                  '+${amenities.length - 6} more',
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    color: GinataColors
+                                                        .textSecondary,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                        ],
                                         Row(
                                           children: [
                                             _buildMetricBadge(Icons.cleaning_services_outlined, 'Cleaning', cleaningFeeKes),

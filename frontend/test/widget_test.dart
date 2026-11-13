@@ -65,9 +65,7 @@ void main() {
     final passwordField = tester.getCenter(
       find.widgetWithText(TextFormField, 'Password *'),
     );
-    final forgotPasswordLink = tester.getCenter(
-      find.text('Forgot password?'),
-    );
+    final forgotPasswordLink = tester.getCenter(find.text('Forgot password?'));
     expect(forgotPasswordLink.dy, greaterThan(passwordField.dy));
     await tester.tap(find.text('Create Account'));
     await tester.pumpAndSettle();
